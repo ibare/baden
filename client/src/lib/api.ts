@@ -60,6 +60,8 @@ export const api = {
     return res.text();
   },
   getRules: (projectId: string) => request<Rule[]>(`/projects/${projectId}/rules`),
+  getRuleContent: (projectId: string, ruleId: string) =>
+    request<{ title: string; body: string }>(`/projects/${projectId}/rules/${ruleId}/content`),
 
   getEvents: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';

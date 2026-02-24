@@ -1,5 +1,17 @@
+import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { RuleEvent, Rule } from '@/lib/api';
+import { api } from '@/lib/api';
 import { EVENT_CATEGORY_MAP, CATEGORY_CONFIG, TYPE_CONFIG } from '@/lib/event-types';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface EventDetailProps {
   event: RuleEvent | null;
@@ -24,6 +36,30 @@ function parseDetail(raw: string | null): Record<string, string> | null {
   }
 }
 
+const TRIGGER_LABELS: Record<string, string> = {
+  paths: '경로',
+  patterns: '패턴',
+  imports: '임포트',
+  events: '이벤트',
+};
+
+function parseTriggers(raw: string | null): Record<string, string[]> | null {
+  if (!raw) return null;
+  try {
+    const obj = JSON.parse(raw);
+    if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) return null;
+    const out: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (Array.isArray(v) && v.length > 0) {
+        out[k] = v.map(String);
+      }
+    }
+    return Object.keys(out).length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-baseline gap-3 py-2.5">
@@ -41,19 +77,151 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h4 className="text-base font-bold text-foreground pt-2 pb-1">{children}</h4>;
 }
 
+function TriggersBlock({ triggers }: { triggers: Record<string, string[]> }) {
+  return (
+    <div className="py-2.5">
+      <dt className="text-xs text-muted-foreground mb-2">Triggers</dt>
+      <dd className="space-y-1.5 ml-1">
+        {Object.entries(triggers).map(([key, values]) => (
+          <div key={key} className="flex items-baseline gap-2">
+            <span className="text-xs text-muted-foreground w-16 shrink-0">
+              {TRIGGER_LABELS[key] || key}
+            </span>
+            <div className="flex flex-wrap gap-1">
+              {values.map((v) => (
+                <code
+                  key={v}
+                  className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono"
+                >
+                  {v}
+                </code>
+              ))}
+            </div>
+          </div>
+        ))}
+      </dd>
+    </div>
+  );
+}
+
+function RuleContentDialog({
+  open,
+  onOpenChange,
+  title,
+  body,
+  loading,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string | null;
+  body: string | null;
+  loading: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-[80vw] max-w-[800px] sm:max-w-[800px] max-h-[80vh] flex flex-col overflow-hidden">
+        <DialogHeader className="shrink-0">
+          <DialogTitle>{title ?? '로딩 중...'}</DialogTitle>
+        </DialogHeader>
+        {loading ? (
+          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+            로딩 중...
+          </div>
+        ) : body !== null ? (
+          <div className="overflow-y-auto min-h-0 prose prose-sm dark:prose-invert max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-table:my-2 prose-code:before:content-none prose-code:after:content-none">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                code({ className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || '');
+                  const codeString = String(children).replace(/\n$/, '');
+                  if (match) {
+                    return (
+                      <SyntaxHighlighter
+                        style={oneLight}
+                        language={match[1]}
+                        PreTag="div"
+                      >
+                        {codeString}
+                      </SyntaxHighlighter>
+                    );
+                  }
+                  return (
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {body}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <div className="overflow-y-auto min-h-0 text-sm text-muted-foreground py-4">
+            파일을 불러올 수 없습니다.
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [ruleTitle, setRuleTitle] = useState<string | null>(null);
+  const [ruleBody, setRuleBody] = useState<string | null>(null);
+  const [contentLoading, setContentLoading] = useState(false);
+
+  const handleFileClick = async () => {
+    if (!rule) return;
+    setDialogOpen(true);
+    setContentLoading(true);
+    try {
+      const { title, body } = await api.getRuleContent(rule.project_id, rule.id);
+      setRuleTitle(title);
+      setRuleBody(body);
+    } catch {
+      setRuleTitle(null);
+      setRuleBody(null);
+    } finally {
+      setContentLoading(false);
+    }
+  };
+
   if (rule && !event) {
+    const triggers = parseTriggers(rule.triggers);
+
     return (
       <div className="flex flex-col p-4 text-sm overflow-y-auto">
         <SectionTitle>Rules</SectionTitle>
         <dl>
           <Row label="Rule ID"><span className="font-mono text-xs">{rule.id}</span></Row>
           <Row label="Category">{rule.category}</Row>
-          <Row label="File"><span className="font-mono text-xs">{rule.file_path}</span></Row>
+          <Row label="File">
+            <button
+              type="button"
+              onClick={handleFileClick}
+              className="font-mono text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2 cursor-pointer hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+            >
+              {rule.file_path}
+            </button>
+          </Row>
           {rule.description && <Row label="Description">{rule.description}</Row>}
-          {rule.triggers && <Row label="Triggers">{rule.triggers}</Row>}
+          {triggers ? (
+            <TriggersBlock triggers={triggers} />
+          ) : rule.triggers ? (
+            <Row label="Triggers">{rule.triggers}</Row>
+          ) : null}
           {ruleEventCount !== undefined && <Row label="Events">{ruleEventCount}건</Row>}
         </dl>
+        <RuleContentDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          title={ruleTitle}
+          body={ruleBody}
+          loading={contentLoading}
+        />
       </div>
     );
   }

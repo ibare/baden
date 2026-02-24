@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import { Router } from 'express';
 import { nanoid } from 'nanoid';
 import db from '../db/connection.js';
@@ -119,6 +121,41 @@ projectsRouter.get('/:id/rules/:ruleId', (req, res) => {
   `).all(req.params.id, req.params.ruleId);
 
   res.json({ ...rule as object, stats });
+});
+
+// GET /api/projects/:id/rules/:ruleId/content - 규칙 파일 마크다운 원문
+projectsRouter.get('/:id/rules/:ruleId/content', (req, res) => {
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id) as Project | undefined;
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  const rule = db.prepare('SELECT * FROM rules WHERE project_id = ? AND id = ?')
+    .get(req.params.id, req.params.ruleId) as Rule | undefined;
+  if (!rule) {
+    res.status(404).json({ error: 'Rule not found' });
+    return;
+  }
+
+  const fullPath = path.resolve(project.rules_path, rule.file_path);
+  if (!fs.existsSync(fullPath)) {
+    res.status(404).json({ error: 'File not found' });
+    return;
+  }
+
+  const raw = fs.readFileSync(fullPath, 'utf-8');
+  const cleaned = raw
+    .replace(/^---\n[\s\S]*?\n---\n*/, '')   // YAML frontmatter
+    .replace(/<!--\s*anchors:[\s\S]*?-->\n*/g, '') // anchors 주석
+    .trimStart();
+
+  // 첫 번째 # 헤딩을 title로 분리
+  const headingMatch = cleaned.match(/^#\s+(.+)\n*/);
+  const title = headingMatch ? headingMatch[1].trim() : rule.file_path;
+  const body = headingMatch ? cleaned.slice(headingMatch[0].length) : cleaned;
+
+  res.json({ title, body });
 });
 
 // PUT /api/projects/:id/sync - rules 디렉토리 재스캔
