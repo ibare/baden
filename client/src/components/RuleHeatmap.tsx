@@ -1,65 +1,153 @@
+import { useMemo } from 'react';
 import type { RuleEvent, Rule } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 interface RuleHeatmapProps {
   rules: Rule[];
   events: RuleEvent[];
+  selectedRuleId: string | null;
+  onSelectRule: (rule: Rule, eventCount: number) => void;
 }
 
 type RuleStatus = 'idle' | 'matched' | 'violated' | 'fixed';
 
-function getStatus(ruleId: string, events: RuleEvent[]): RuleStatus {
-  const ruleEvents = events.filter((e) => e.rule_id === ruleId);
-  if (ruleEvents.length === 0) return 'idle';
-
-  const hasFix = ruleEvents.some((e) => e.type === 'fix_applied');
-  const hasViolation = ruleEvents.some((e) => e.type === 'violation_found');
-
-  if (hasFix) return 'fixed';
-  if (hasViolation) return 'violated';
-  return 'matched';
+function formatRelativeTime(timestamp: string): string {
+  const diff = Date.now() - new Date(timestamp).getTime();
+  if (diff < 0) return '방금';
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return '방금';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `${days}d`;
 }
 
-const STATUS_STYLES: Record<RuleStatus, string> = {
-  idle: 'bg-muted border-border text-muted-foreground',
-  matched: 'bg-secondary border-secondary-foreground/20 text-secondary-foreground',
-  violated: 'bg-red-500/20 border-red-500/40 text-red-400',
-  fixed: 'bg-green-500/20 border-green-500/40 text-green-400',
+const STATUS_LABEL: Record<RuleStatus, string> = {
+  idle: '대기',
+  matched: '매칭',
+  violated: '위반',
+  fixed: '수정',
 };
 
-export function RuleHeatmap({ rules, events }: RuleHeatmapProps) {
+const DOT_STYLE: Record<RuleStatus, string> = {
+  idle: 'border border-muted-foreground/40 bg-transparent',
+  matched: 'bg-blue-500',
+  violated: 'bg-red-500',
+  fixed: 'bg-green-500',
+};
+
+const LABEL_COLOR: Record<RuleStatus, string> = {
+  idle: 'text-muted-foreground',
+  matched: 'text-blue-600',
+  violated: 'text-red-600',
+  fixed: 'text-green-600',
+};
+
+export function RuleHeatmap({ rules, events, selectedRuleId, onSelectRule }: RuleHeatmapProps) {
+  const { countMap, statusMap, lastEventMap } = useMemo(() => {
+    const countMap = new Map<string, number>();
+    const statusMap = new Map<string, RuleStatus>();
+    const lastEventMap = new Map<string, string>();
+
+    // Track per-rule flags in a single pass
+    const hasViolation = new Set<string>();
+    const hasFix = new Set<string>();
+    const seen = new Set<string>();
+
+    for (const e of events) {
+      const rid = e.rule_id;
+      if (!rid) continue;
+
+      countMap.set(rid, (countMap.get(rid) || 0) + 1);
+      seen.add(rid);
+
+      // Track latest timestamp
+      const prev = lastEventMap.get(rid);
+      if (!prev || e.timestamp > prev) {
+        lastEventMap.set(rid, e.timestamp);
+      }
+
+      if (e.type === 'violation_found') hasViolation.add(rid);
+      if (e.type === 'fix_applied') hasFix.add(rid);
+    }
+
+    for (const rid of seen) {
+      if (hasFix.has(rid)) statusMap.set(rid, 'fixed');
+      else if (hasViolation.has(rid)) statusMap.set(rid, 'violated');
+      else statusMap.set(rid, 'matched');
+    }
+
+    return { countMap, statusMap, lastEventMap };
+  }, [events]);
+
   return (
-    <Card className="h-full flex flex-col py-4 gap-3">
-      <CardHeader className="px-4 py-0">
-        <CardTitle className="text-sm">규칙 히트맵</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 overflow-y-auto min-h-0 px-4">
-        <div className="grid grid-cols-3 gap-2">
+    <div className="flex flex-col h-full">
+      {/* Scrollable rule list */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-1 pt-2">
+        <div className="flex flex-col">
           {rules.map((rule) => {
-            const status = getStatus(rule.id, events);
-            const count = events.filter((e) => e.rule_id === rule.id).length;
+            const status: RuleStatus = statusMap.get(rule.id) ?? 'idle';
+            const count = countMap.get(rule.id) || 0;
+            const lastTs = lastEventMap.get(rule.id);
+            const isSelected = rule.id === selectedRuleId;
+
             return (
               <div
                 key={`${rule.project_id}-${rule.id}`}
-                className={`border rounded-lg p-2 text-center cursor-default transition-colors ${STATUS_STYLES[status]}`}
-                title={rule.description || rule.file_path}
+                onClick={() => onSelectRule(rule, count)}
+                className={cn(
+                  'flex items-center gap-2 px-2 py-1 cursor-pointer transition-colors rounded-sm',
+                  'hover:bg-muted/50',
+                  status === 'violated' && 'bg-red-500/5',
+                  isSelected && 'ring-1 ring-primary bg-muted/30',
+                )}
               >
-                <div className="font-mono text-sm font-bold">{rule.id}</div>
-                {count > 0 && <div className="text-xs mt-0.5">{count}</div>}
+                {/* Status dot */}
+                <span
+                  className={cn('w-2 h-2 rounded-full shrink-0', DOT_STYLE[status])}
+                />
+                {/* Rule ID */}
+                <span className="w-20 font-mono text-xs truncate text-foreground/80">
+                  {rule.id}
+                </span>
+                {/* Description */}
+                <span className="flex-1 text-xs truncate text-muted-foreground">
+                  {rule.description ?? rule.file_path}
+                </span>
+                {/* Status label */}
+                <span className={cn('w-8 text-xs text-center shrink-0', LABEL_COLOR[status])}>
+                  {STATUS_LABEL[status]}
+                </span>
+                {/* Relative time */}
+                <span className="w-8 text-xs text-right text-muted-foreground shrink-0">
+                  {lastTs ? formatRelativeTime(lastTs) : '-'}
+                </span>
               </div>
             );
           })}
         </div>
+
         {rules.length === 0 && (
-          <div className="text-sm text-muted-foreground text-center py-8">규칙 없음</div>
+          <div className="text-xs text-muted-foreground text-center py-4">규칙 없음</div>
         )}
-      </CardContent>
-      <div className="flex gap-3 px-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-muted-foreground/30" /> 대기</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-secondary-foreground/50" /> 매칭</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-500" /> 위반</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-green-500" /> 수정</span>
       </div>
-    </Card>
+
+      {/* Legend — pinned to bottom */}
+      <div className="flex-shrink-0 flex gap-2.5 px-3 py-1.5 text-xs text-muted-foreground border-t border-border">
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full border border-muted-foreground/40" /> 대기
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-blue-500" /> 매칭
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-red-500" /> 위반
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-green-500" /> 수정
+        </span>
+      </div>
+    </div>
   );
 }

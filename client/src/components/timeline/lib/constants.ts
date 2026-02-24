@@ -1,0 +1,35 @@
+import type { EventCategory } from '@/lib/event-types';
+
+// Layout dimensions
+export const LABEL_WIDTH = 72;
+export const TIME_AXIS_HEIGHT = 28;
+export const SUB_ROW_HEIGHT = 28;
+export const BAR_HEIGHT = 22;
+export const LANE_GAP = 6;
+export const MARKER_SIZE = 10;
+export const MIN_BAR_WIDTH_PX = 4;
+export const TEXT_MIN_WIDTH_PX = 50;
+export const INSTANT_THRESHOLD_MS = 5000;
+export const MAX_SUB_ROWS = 8;
+
+// Zoom — ruler-based: 1 ruler tick = zoomSeconds, pixel gap fixed
+export const RULER_SPACING_PX = 80;
+/** Slider min/max/step/default in seconds */
+export const SLIDER_MIN_SEC = 30;
+export const SLIDER_MAX_SEC = 1800; // 30분
+export const SLIDER_STEP_SEC = 30;
+export const DEFAULT_ZOOM_SEC = 60; // 1분
+
+// Duration inference
+export const MAX_GAP_DURATION_MS = 5 * 60_000;
+export const DEFAULT_LAST_DURATION_MS = 30_000;
+
+// Category ordering
+export const CATEGORY_ORDER: EventCategory[] = [
+  'exploration',
+  'planning',
+  'implementation',
+  'verification',
+  'debugging',
+  'rule_compliance',
+];

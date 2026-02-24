@@ -20,9 +20,27 @@ eventsRouter.post('/', (req, res) => {
   }
 });
 
+// GET /api/events/dates - 이벤트가 있는 날짜 목록
+eventsRouter.get('/dates', (req, res) => {
+  const { projectId } = req.query;
+
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (projectId) {
+    conditions.push('project_id = ?');
+    params.push(projectId);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const sql = `SELECT DISTINCT date(timestamp) as date FROM events ${where} ORDER BY date DESC`;
+  const rows = db.prepare(sql).all(...params) as { date: string }[];
+  res.json(rows.map((r) => r.date));
+});
+
 // GET /api/events - 이벤트 조회
 eventsRouter.get('/', (req, res) => {
-  const { projectId, type, ruleId, limit = '100', offset = '0' } = req.query;
+  const { projectId, type, ruleId, date, limit = '100', offset = '0' } = req.query;
 
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -39,11 +57,19 @@ eventsRouter.get('/', (req, res) => {
     conditions.push('rule_id = ?');
     params.push(ruleId);
   }
+  if (date && typeof date === 'string') {
+    conditions.push("date(timestamp) = ?");
+    params.push(date);
+  }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
   const sql = `SELECT * FROM events ${where} ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
   params.push(Number(limit), Number(offset));
 
-  const events = db.prepare(sql).all(...params);
-  res.json(events);
+  const events = db.prepare(sql).all(...params) as Record<string, unknown>[];
+  // SQLite datetime('now')는 UTC지만 'Z' 접미사가 없으므로 명시적으로 추가
+  res.json(events.map((e) => ({
+    ...e,
+    timestamp: e.timestamp ? `${e.timestamp}Z` : e.timestamp,
+  })));
 });

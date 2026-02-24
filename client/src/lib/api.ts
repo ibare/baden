@@ -62,6 +62,9 @@ export const api = {
     return request<RuleEvent[]>(`/events${qs}`);
   },
 
+  getEventDates: (projectId: string) =>
+    request<string[]>(`/events/dates?projectId=${projectId}`),
+
   createProject: (data: { name: string; description?: string; rulesPath: string }) =>
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(data) }),
 };

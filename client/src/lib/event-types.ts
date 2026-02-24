@@ -30,31 +30,31 @@ export const EVENT_CATEGORY_MAP: Record<string, EventCategory> = {
 
 export const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   // exploration
-  code_search: { icon: '⌕', color: 'text-teal-400' },
-  doc_read: { icon: '📄', color: 'text-teal-400' },
-  dependency_check: { icon: '📦', color: 'text-teal-400' },
-  file_read: { icon: '◇', color: 'text-teal-400' },
+  code_search: { icon: '⌕', color: 'text-teal-600' },
+  doc_read: { icon: '📄', color: 'text-teal-600' },
+  dependency_check: { icon: '📦', color: 'text-teal-600' },
+  file_read: { icon: '◇', color: 'text-teal-600' },
   // planning
-  task_analysis: { icon: '🧠', color: 'text-purple-400' },
-  approach_decision: { icon: '⑂', color: 'text-purple-400' },
+  task_analysis: { icon: '🧠', color: 'text-purple-600' },
+  approach_decision: { icon: '⑂', color: 'text-purple-600' },
   // implementation
-  code_create: { icon: '＋', color: 'text-orange-400' },
-  code_modify: { icon: '✎', color: 'text-orange-400' },
-  refactor: { icon: '⟲', color: 'text-orange-400' },
-  file_write: { icon: '◆', color: 'text-orange-400' },
+  code_create: { icon: '＋', color: 'text-orange-600' },
+  code_modify: { icon: '✎', color: 'text-orange-600' },
+  refactor: { icon: '⟲', color: 'text-orange-600' },
+  file_write: { icon: '◆', color: 'text-orange-600' },
   // verification
-  test_run: { icon: '⚡', color: 'text-yellow-400' },
-  build_run: { icon: '🔧', color: 'text-yellow-400' },
-  lint_run: { icon: '✦', color: 'text-yellow-400' },
+  test_run: { icon: '⚡', color: 'text-yellow-600' },
+  build_run: { icon: '🔧', color: 'text-yellow-600' },
+  lint_run: { icon: '✦', color: 'text-yellow-600' },
   // debugging
-  error_encountered: { icon: '✕', color: 'text-red-400' },
-  error_resolved: { icon: '✓', color: 'text-emerald-400' },
+  error_encountered: { icon: '✕', color: 'text-amber-600' },
+  error_resolved: { icon: '✓', color: 'text-emerald-600' },
   // rule_compliance
-  rule_match: { icon: '◎', color: 'text-gray-400' },
-  violation_found: { icon: '⊘', color: 'text-red-400' },
-  fix_applied: { icon: '✓', color: 'text-green-400' },
+  rule_match: { icon: '◎', color: 'text-rose-600' },
+  violation_found: { icon: '⊘', color: 'text-rose-600' },
+  fix_applied: { icon: '✓', color: 'text-green-600' },
   // query protocol
-  query: { icon: '▸', color: 'text-cyan-400' },
+  query: { icon: '▸', color: 'text-cyan-600' },
 };
 
 export interface EventTypeGroup {
@@ -76,6 +76,6 @@ export const CATEGORY_CONFIG: Record<EventCategory, { label: string; color: stri
   planning: { label: '계획', color: 'purple' },
   implementation: { label: '구현', color: 'orange' },
   verification: { label: '검증', color: 'yellow' },
-  debugging: { label: '디버깅', color: 'red' },
-  rule_compliance: { label: '규칙', color: 'gray' },
+  debugging: { label: '디버깅', color: 'amber' },
+  rule_compliance: { label: '규칙', color: 'rose' },
 };

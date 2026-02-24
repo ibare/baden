@@ -17,9 +17,10 @@ import { Plus } from 'lucide-react';
 
 interface CreateProjectDialogProps {
   onCreated: (project: Project) => void;
+  children?: React.ReactNode;
 }
 
-export function CreateProjectDialog({ onCreated }: CreateProjectDialogProps) {
+export function CreateProjectDialog({ onCreated, children }: CreateProjectDialogProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -59,9 +60,11 @@ export function CreateProjectDialog({ onCreated }: CreateProjectDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="icon-sm">
-          <Plus />
-        </Button>
+        {children ?? (
+          <Button variant="outline" size="icon-sm">
+            <Plus />
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
