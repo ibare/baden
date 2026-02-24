@@ -46,6 +46,10 @@ export interface RuleEvent {
   agent: string | null;
   step: string | null;
   duration_ms: number | null;
+  prompt: string | null;
+  summary: string | null;
+  result: string | null;
+  task_id: string | null;
 }
 
 export const api = {

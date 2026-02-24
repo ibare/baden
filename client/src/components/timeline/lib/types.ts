@@ -9,6 +9,8 @@ export interface TimelineItem {
   startMs: number;
   endMs: number;
   isInstant: boolean;
+  /** Duration was capped at MAX_GAP — actual end time unknown */
+  truncated: boolean;
 }
 
 /** Item placed in a lane + sub-row with pixel coordinates */

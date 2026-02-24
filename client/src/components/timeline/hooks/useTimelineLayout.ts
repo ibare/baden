@@ -40,19 +40,27 @@ export function useTimelineLayout(
       const cat = EVENT_CATEGORY_MAP[e.type] || 'exploration';
       const startMs = new Date(e.timestamp).getTime();
       let endMs: number;
+      let truncated = false;
 
       if (e.duration_ms) {
         endMs = startMs + e.duration_ms;
       } else if (i < sorted.length - 1) {
         const nextStart = new Date(sorted[i + 1].timestamp).getTime();
-        endMs = startMs + Math.min(nextStart - startMs, MAX_GAP_DURATION_MS);
+        const gap = nextStart - startMs;
+        if (gap > MAX_GAP_DURATION_MS) {
+          endMs = startMs + MAX_GAP_DURATION_MS;
+          truncated = true;
+        } else {
+          endMs = startMs + gap;
+        }
       } else {
         endMs = startMs + DEFAULT_LAST_DURATION_MS;
+        truncated = true;
       }
 
       const isInstant = endMs - startMs < INSTANT_THRESHOLD_MS;
 
-      return { id: e.id, event: e, category: cat, startMs, endMs, isInstant };
+      return { id: e.id, event: e, category: cat, startMs, endMs, isInstant, truncated };
     });
   }, [events]);
 
@@ -78,6 +86,16 @@ export function useTimelineLayout(
     const padding = span * 0.03;
     const start = min - padding;
     let end = max + padding + DEFAULT_LAST_DURATION_MS;
+
+    // Always extend to at least current time (today) or end of day (past dates)
+    const today = new Date().toISOString().slice(0, 10);
+    if (selectedDate === today) {
+      const nowWithPadding = Date.now() + 5 * 60_000;
+      if (nowWithPadding > end) end = nowWithPadding;
+    } else {
+      const endOfDay = new Date(selectedDate + 'T23:59:59').getTime();
+      if (endOfDay > end) end = endOfDay;
+    }
 
     // Extend rangeEnd so the ruler fills at least the viewport
     if (end - start < viewportMs) {

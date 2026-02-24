@@ -17,6 +17,8 @@ export const TimelineBar = memo(function TimelineBar({
   const [hovered, setHovered] = useState(false);
   const colors = CATEGORY_COLORS[item.category];
   const clipId = `bar-clip-${item.id}`;
+  const maskId = `bar-mask-${item.id}`;
+  const truncated = item.truncated && !item.isInstant && item.width >= 40;
 
   const label =
     item.event.action || item.event.type.replace(/_/g, ' ');
@@ -54,6 +56,38 @@ export const TimelineBar = memo(function TimelineBar({
           <rect x={item.x} y={item.y} width={item.width} height={BAR_HEIGHT} rx={3} />
         </clipPath>
       )}
+      {truncated && (() => {
+        const cx = item.x + item.width - 28;
+        const ty = item.y - 2;
+        const by = item.y + BAR_HEIGHT + 2;
+        const amp = 3;
+        const segments = 3;
+        const step = (by - ty) / segments;
+        const buildWavy = (offsetX: number) => {
+          let d = `M${cx + offsetX},${ty}`;
+          for (let i = 0; i < segments; i++) {
+            const cy1 = ty + step * i + step / 2;
+            const dir = i % 2 === 0 ? 1 : -1;
+            d += ` Q${cx + offsetX + amp * dir},${cy1} ${cx + offsetX},${ty + step * (i + 1)}`;
+          }
+          return d;
+        };
+        // Shape between the two wavy lines (gap region)
+        const leftWavy = buildWavy(-2.5);
+        let rightWavyReverse = `M${cx + 2.5},${by}`;
+        for (let i = segments - 1; i >= 0; i--) {
+          const cy1 = ty + step * i + step / 2;
+          const dir = i % 2 === 0 ? 1 : -1;
+          rightWavyReverse += ` Q${cx + 2.5 + amp * dir},${cy1} ${cx + 2.5},${ty + step * i}`;
+        }
+        const gapPath = leftWavy + ` L${cx + 2.5},${by}` + rightWavyReverse.slice(rightWavyReverse.indexOf(' ')) + ' Z';
+        return (
+          <mask id={maskId}>
+            <rect x={item.x - 1} y={item.y - 1} width={item.width + 2} height={BAR_HEIGHT + 2} fill="white" />
+            <path d={gapPath} fill="black" />
+          </mask>
+        );
+      })()}
       <rect
         x={item.x}
         y={item.y}
@@ -64,7 +98,31 @@ export const TimelineBar = memo(function TimelineBar({
         fillOpacity={0.75}
         stroke={hovered ? colors.stroke : 'none'}
         strokeWidth={hovered ? 1 : 0}
+        mask={truncated ? `url(#${maskId})` : undefined}
       />
+      {truncated && (() => {
+        const cx = item.x + item.width - 28;
+        const ty = item.y - 2;
+        const by = item.y + BAR_HEIGHT + 2;
+        const amp = 3;
+        const segments = 3;
+        const step = (by - ty) / segments;
+        const buildWavy = (offsetX: number) => {
+          let d = `M${cx + offsetX},${ty}`;
+          for (let i = 0; i < segments; i++) {
+            const cy1 = ty + step * i + step / 2;
+            const dir = i % 2 === 0 ? 1 : -1;
+            d += ` Q${cx + offsetX + amp * dir},${cy1} ${cx + offsetX},${ty + step * (i + 1)}`;
+          }
+          return d;
+        };
+        return (
+          <>
+            <path d={buildWavy(-2.5)} fill="none" stroke={colors.stroke} strokeWidth={1.2} strokeOpacity={0.4} />
+            <path d={buildWavy(2.5)} fill="none" stroke={colors.stroke} strokeWidth={1.2} strokeOpacity={0.4} />
+          </>
+        );
+      })()}
       {showText && (
         <text
           x={item.x + 4}

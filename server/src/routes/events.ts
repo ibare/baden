@@ -40,7 +40,7 @@ eventsRouter.get('/dates', (req, res) => {
 
 // GET /api/events - 이벤트 조회
 eventsRouter.get('/', (req, res) => {
-  const { projectId, type, ruleId, date, limit = '100', offset = '0' } = req.query;
+  const { projectId, type, ruleId, taskId, date, limit = '100', offset = '0' } = req.query;
 
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -56,6 +56,10 @@ eventsRouter.get('/', (req, res) => {
   if (ruleId) {
     conditions.push('rule_id = ?');
     params.push(ruleId);
+  }
+  if (taskId) {
+    conditions.push('task_id = ?');
+    params.push(taskId);
   }
   if (date && typeof date === 'string') {
     conditions.push("date(timestamp) = ?");

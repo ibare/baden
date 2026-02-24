@@ -25,6 +25,7 @@ export const EVENT_CATEGORY_MAP: Record<string, EventCategory> = {
   rule_match: 'rule_compliance',
   violation_found: 'rule_compliance',
   fix_applied: 'rule_compliance',
+  task_complete: 'planning',
   query: 'exploration',
 };
 
@@ -37,6 +38,7 @@ export const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   // planning
   task_analysis: { icon: '🧠', color: 'text-purple-600' },
   approach_decision: { icon: '⑂', color: 'text-purple-600' },
+  task_complete: { icon: '✔', color: 'text-purple-600' },
   // implementation
   code_create: { icon: '＋', color: 'text-orange-600' },
   code_modify: { icon: '✎', color: 'text-orange-600' },
@@ -64,7 +66,7 @@ export interface EventTypeGroup {
 
 export const EVENT_TYPE_GROUPS: EventTypeGroup[] = [
   { label: '탐색', types: ['code_search', 'doc_read', 'dependency_check', 'file_read'] },
-  { label: '계획', types: ['task_analysis', 'approach_decision'] },
+  { label: '계획', types: ['task_analysis', 'approach_decision', 'task_complete'] },
   { label: '구현', types: ['code_create', 'code_modify', 'refactor', 'file_write'] },
   { label: '검증', types: ['test_run', 'build_run', 'lint_run'] },
   { label: '디버깅', types: ['error_encountered', 'error_resolved'] },

@@ -23,6 +23,8 @@ export type EventType =
   | 'rule_match'
   | 'violation_found'
   | 'fix_applied'
+  // completion
+  | 'task_complete'
   // query protocol
   | 'query';
 
@@ -53,6 +55,7 @@ export const EVENT_CATEGORY_MAP: Record<EventType, EventCategory> = {
   rule_match: 'rule_compliance',
   violation_found: 'rule_compliance',
   fix_applied: 'rule_compliance',
+  task_complete: 'planning',
   query: 'exploration',
 };
 
@@ -95,6 +98,10 @@ export interface RuleEvent {
   agent: string | null;
   step: string | null;
   duration_ms: number | null;
+  prompt: string | null;
+  summary: string | null;
+  result: string | null;
+  task_id: string | null;
 }
 
 export interface EventInput {
@@ -110,6 +117,10 @@ export interface EventInput {
   agent?: string;
   step?: string;
   durationMs?: number;
+  prompt?: string;
+  summary?: string;
+  result?: string;
+  taskId?: string;
 }
 
 export interface QueryInput {
@@ -121,6 +132,10 @@ export interface QueryInput {
   ruleId?: string;
   severity?: string;
   agent?: string;
+  prompt?: string;
+  summary?: string;
+  result?: string;
+  taskId?: string;
 }
 
 export interface ParsedRule {

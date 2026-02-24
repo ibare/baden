@@ -43,6 +43,9 @@ export const TimelineTooltip = memo(function TimelineTooltip({
           rule: {item.event.rule_id}
         </div>
       )}
+      {item.event.result && (
+        <div className="text-muted-foreground mt-0.5 truncate">{item.event.result}</div>
+      )}
     </div>
   );
 });

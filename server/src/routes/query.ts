@@ -26,6 +26,7 @@ const ACTION_PATTERNS: [RegExp, EventType][] = [
   [/\bdependenc|package\.json|requirements|의존/i, 'dependency_check'],
   [/\bread|읽/i, 'file_read'],
   // planning
+  [/\btask.?complete|작업.*완료|작업.*마침/i, 'task_complete'],
   [/\banalyz|분석|요구사항|task.*break/i, 'task_analysis'],
   [/\bdecid|결정|approach|방식.*선택/i, 'approach_decision'],
   // implementation
@@ -83,6 +84,10 @@ queryRouter.post('/', (req, res) => {
       ruleId: q.ruleId,
       severity: q.severity as Severity | undefined,
       agent: q.agent,
+      prompt: q.prompt,
+      summary: q.summary,
+      result: q.result,
+      taskId: q.taskId,
     };
     processEvent(input);
 

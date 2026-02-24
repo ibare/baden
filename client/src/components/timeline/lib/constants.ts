@@ -15,9 +15,9 @@ export const MAX_SUB_ROWS = 8;
 // Zoom — ruler-based: 1 ruler tick = zoomSeconds, pixel gap fixed
 export const RULER_SPACING_PX = 80;
 /** Slider min/max/step/default in seconds */
-export const SLIDER_MIN_SEC = 30;
-export const SLIDER_MAX_SEC = 1800; // 30분
-export const SLIDER_STEP_SEC = 30;
+export const SLIDER_MIN_SEC = 10;
+export const SLIDER_MAX_SEC = 120; // 2분
+export const SLIDER_STEP_SEC = 10;
 export const DEFAULT_ZOOM_SEC = 60; // 1분
 
 // Duration inference

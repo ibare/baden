@@ -94,6 +94,12 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
             <dd className="text-foreground">{event.severity}</dd>
           </>
         )}
+        {event.task_id && (
+          <>
+            <dt className="text-muted-foreground">작업 ID</dt>
+            <dd className="text-foreground font-mono text-[10px]">{event.task_id}</dd>
+          </>
+        )}
         {event.agent && (
           <>
             <dt className="text-muted-foreground">에이전트</dt>
@@ -107,10 +113,32 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
           </>
         )}
       </dl>
+      {event.prompt && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">prompt</div>
+          <div className="text-xs text-foreground bg-purple-50 dark:bg-purple-950/30 rounded p-2 whitespace-pre-wrap break-words">
+            {event.prompt}
+          </div>
+        </div>
+      )}
       {event.message && (
         <div>
           <div className="text-xs text-muted-foreground mb-1">reason</div>
           <p className="text-xs text-foreground whitespace-pre-wrap break-words">{event.message}</p>
+        </div>
+      )}
+      {event.summary && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">summary</div>
+          <p className="text-xs text-foreground whitespace-pre-wrap break-words">{event.summary}</p>
+        </div>
+      )}
+      {event.result && (
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">result</div>
+          <pre className="text-xs text-foreground bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
+            {event.result}
+          </pre>
         </div>
       )}
       {parsedDetail && (

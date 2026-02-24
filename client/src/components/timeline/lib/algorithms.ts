@@ -9,6 +9,7 @@ import {
   MAX_SUB_ROWS,
   TIME_AXIS_HEIGHT,
   CATEGORY_ORDER,
+  RULER_SPACING_PX,
 } from './constants';
 
 /**
@@ -35,7 +36,8 @@ export function assignSubRows(
 
     let placed = false;
     for (let row = 0; row < subRowEnds.length && row < MAX_SUB_ROWS; row++) {
-      if (subRowEnds[row] <= startPx) {
+      const gap = item.isInstant ? 0 : RULER_SPACING_PX;
+      if (subRowEnds[row] + gap <= startPx) {
         subRowEnds[row] = endPx;
         results[index] = row;
         placed = true;

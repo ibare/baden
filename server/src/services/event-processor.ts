@@ -4,8 +4,8 @@ import { broadcast } from '../ws.js';
 import type { EventInput, RuleEvent } from '../types.js';
 
 const insertEvent = db.prepare(`
-  INSERT INTO events (id, timestamp, type, project_id, rule_id, severity, file, line, message, detail, action, agent, step, duration_ms)
-  VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  INSERT INTO events (id, timestamp, type, project_id, rule_id, severity, file, line, message, detail, action, agent, step, duration_ms, prompt, summary, result, task_id)
+  VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 export function processEvent(input: EventInput): RuleEvent {
@@ -27,6 +27,10 @@ export function processEvent(input: EventInput): RuleEvent {
     input.agent || null,
     input.step || null,
     input.durationMs || null,
+    input.prompt || null,
+    input.summary || null,
+    input.result || null,
+    input.taskId || null,
   );
 
   const event: RuleEvent = {
@@ -44,6 +48,10 @@ export function processEvent(input: EventInput): RuleEvent {
     agent: input.agent || null,
     step: input.step || null,
     duration_ms: input.durationMs || null,
+    prompt: input.prompt || null,
+    summary: input.summary || null,
+    result: input.result || null,
+    task_id: input.taskId || null,
   };
 
   broadcast(event, input.projectId);

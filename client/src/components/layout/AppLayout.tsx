@@ -164,7 +164,7 @@ export function AppLayout() {
       if (cat && !activeCategories.has(cat)) return false;
       if (search) {
         const s = search.toLowerCase();
-        const searchable = [e.file, e.message, e.rule_id, e.type, e.action, e.step]
+        const searchable = [e.file, e.message, e.rule_id, e.type, e.action, e.step, e.task_id]
           .filter(Boolean)
           .join(' ')
           .toLowerCase();

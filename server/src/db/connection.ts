@@ -90,6 +90,20 @@ if (tables) {
   console.log('[DB] Migration complete: sessions removed');
 }
 
+// Migration: add prompt, summary, result, task_id columns
+const hasTaskId = db.prepare("SELECT COUNT(*) as cnt FROM pragma_table_info('events') WHERE name='task_id'").get() as { cnt: number };
+if (hasTaskId.cnt === 0) {
+  console.log('[DB] Migrating: adding prompt, summary, result, task_id columns...');
+  db.exec(`
+    ALTER TABLE events ADD COLUMN prompt TEXT;
+    ALTER TABLE events ADD COLUMN summary TEXT;
+    ALTER TABLE events ADD COLUMN result TEXT;
+    ALTER TABLE events ADD COLUMN task_id TEXT;
+    CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
+  `);
+  console.log('[DB] Migration complete: new columns added');
+}
+
 db.pragma('foreign_keys = ON');
 
 export default db;
