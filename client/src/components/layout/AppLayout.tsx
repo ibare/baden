@@ -62,6 +62,8 @@ export function AppLayout() {
   // Drawer
   const [drawerEvent, setDrawerEvent] = useState<RuleEvent | null>(null);
   const [drawerRule, setDrawerRule] = useState<Rule | null>(null);
+  const [drawerPinned, setDrawerPinned] = useState(false);
+  const [drawerWidth, setDrawerWidth] = useState(384);
 
   const currentProject = useMemo(
     () => projects.find((p) => p.id === selectedProject) ?? null,
@@ -140,6 +142,10 @@ export function AppLayout() {
     setDrawerRule(null);
   }, []);
 
+  const handleTogglePin = useCallback(() => {
+    setDrawerPinned((prev) => !prev);
+  }, []);
+
   const handleProjectCreated = useCallback(
     (project: Project) => {
       addProject(project);
@@ -184,59 +190,82 @@ export function AppLayout() {
         onProjectCreated={handleProjectCreated}
       />
 
-      {/* Main area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <TopBar connected={connected} />
-        <ProjectHeader project={currentProject} />
+      {/* Main area + pinned drawer */}
+      <div className="flex-1 flex min-w-0 min-h-0">
+        {/* Main content */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <TopBar connected={connected} />
+          <ProjectHeader project={currentProject} />
 
-        {selectedProject && (
-          <div ref={containerRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {/* Timeline */}
-            <div className="min-h-0 overflow-hidden" style={{ height: `${splitRatio * 100}%` }}>
-              <Timeline
-                events={filteredEvents}
-                allEvents={events}
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                eventDates={eventDates}
-                activeCategories={activeCategories}
-                onToggleCategory={toggleCategory}
-                search={search}
-                onSearchChange={setSearch}
-                onSelectEvent={handleSelectEvent}
-              />
-            </div>
+          {selectedProject && (
+            <div ref={containerRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+              {/* Timeline */}
+              <div className="min-h-0 overflow-hidden" style={{ height: `${splitRatio * 100}%` }}>
+                <Timeline
+                  events={filteredEvents}
+                  allEvents={events}
+                  selectedDate={selectedDate}
+                  onDateChange={setSelectedDate}
+                  eventDates={eventDates}
+                  activeCategories={activeCategories}
+                  onToggleCategory={toggleCategory}
+                  search={search}
+                  onSearchChange={setSearch}
+                  onSelectEvent={handleSelectEvent}
+                />
+              </div>
 
-            {/* Drag handle */}
-            <div
-              className="relative flex-shrink-0 h-0 z-10"
-              onMouseDown={handleDragStart}
-            >
-              <div className="absolute inset-x-0 -top-[6px] h-[12px] cursor-row-resize flex items-center justify-center">
-                <div className="w-10 h-[5px] rounded-full bg-border hover:bg-muted-foreground/40 transition-colors" />
+              {/* Drag handle */}
+              <div
+                className="relative flex-shrink-0 h-0 z-10"
+                onMouseDown={handleDragStart}
+              >
+                <div className="absolute inset-x-0 -top-[6px] h-[12px] cursor-row-resize flex items-center justify-center">
+                  <div className="w-10 h-[5px] rounded-full bg-border hover:bg-muted-foreground/40 transition-colors" />
+                </div>
+              </div>
+
+              {/* Rules */}
+              <div className="flex-1 min-h-0 border-t border-border">
+                <RuleHeatmap
+                  rules={rules}
+                  events={events}
+                  selectedRuleId={drawerRule?.id ?? null}
+                  onSelectRule={handleSelectRule}
+                />
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Rules */}
-            <div className="flex-1 min-h-0 border-t border-border">
-              <RuleHeatmap
-                rules={rules}
-                events={events}
-                selectedRuleId={drawerRule?.id ?? null}
-                onSelectRule={handleSelectRule}
-              />
-            </div>
-          </div>
+        {/* Pinned sidebar (in-flow) */}
+        {drawerPinned && (
+          <EventDrawer
+            isOpen={!!(drawerEvent || drawerRule)}
+            event={drawerEvent}
+            rule={drawerRule}
+            pinned={drawerPinned}
+            pinnedWidth={drawerWidth}
+            onClose={handleCloseDrawer}
+            onTogglePin={handleTogglePin}
+            onWidthChange={setDrawerWidth}
+          />
         )}
       </div>
 
-      {/* Drawer */}
-      <EventDrawer
-        isOpen={!!(drawerEvent || drawerRule)}
-        event={drawerEvent}
-        rule={drawerRule}
-        onClose={handleCloseDrawer}
-      />
+      {/* Overlay drawer (not pinned) */}
+      {!drawerPinned && (
+        <EventDrawer
+          isOpen={!!(drawerEvent || drawerRule)}
+          event={drawerEvent}
+          rule={drawerRule}
+          pinned={drawerPinned}
+          pinnedWidth={drawerWidth}
+          onClose={handleCloseDrawer}
+          onTogglePin={handleTogglePin}
+          onWidthChange={setDrawerWidth}
+        />
+      )}
     </div>
   );
 }

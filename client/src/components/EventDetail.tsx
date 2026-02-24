@@ -7,35 +7,52 @@ interface EventDetailProps {
   ruleEventCount?: number;
 }
 
+/** Try to parse a JSON string into a flat record for display */
+function parseDetail(raw: string | null): Record<string, string> | null {
+  if (!raw) return null;
+  try {
+    const obj = JSON.parse(raw);
+    if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) return null;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v === null || v === undefined) continue;
+      out[k] = typeof v === 'object' ? JSON.stringify(v) : String(v);
+    }
+    return Object.keys(out).length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-3 py-2.5">
+      <dt className="w-24 shrink-0 text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-sm text-foreground font-medium break-all min-w-0">{children}</dd>
+    </div>
+  );
+}
+
+function Divider() {
+  return <div className="border-t border-dashed border-border/60 my-2" />;
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h4 className="text-base font-bold text-foreground pt-2 pb-1">{children}</h4>;
+}
+
 export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
   if (rule && !event) {
     return (
-      <div className="flex flex-col gap-3 p-3 text-sm">
-        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">규칙 상세</h4>
-        <div className="font-medium text-foreground font-mono">{rule.id}</div>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
-          <dt className="text-muted-foreground">카테고리</dt>
-          <dd className="text-foreground">{rule.category}</dd>
-          <dt className="text-muted-foreground">파일</dt>
-          <dd className="text-foreground break-all">{rule.file_path}</dd>
-          {rule.description && (
-            <>
-              <dt className="text-muted-foreground">설명</dt>
-              <dd className="text-foreground">{rule.description}</dd>
-            </>
-          )}
-          {rule.triggers && (
-            <>
-              <dt className="text-muted-foreground">트리거</dt>
-              <dd className="text-foreground">{rule.triggers}</dd>
-            </>
-          )}
-          {ruleEventCount !== undefined && (
-            <>
-              <dt className="text-muted-foreground">이벤트</dt>
-              <dd className="text-foreground">{ruleEventCount}건</dd>
-            </>
-          )}
+      <div className="flex flex-col p-4 text-sm overflow-y-auto">
+        <SectionTitle>Rules</SectionTitle>
+        <dl>
+          <Row label="Rule ID"><span className="font-mono text-xs">{rule.id}</span></Row>
+          <Row label="Category">{rule.category}</Row>
+          <Row label="File"><span className="font-mono text-xs">{rule.file_path}</span></Row>
+          {rule.description && <Row label="Description">{rule.description}</Row>}
+          {rule.triggers && <Row label="Triggers">{rule.triggers}</Row>}
+          {ruleEventCount !== undefined && <Row label="Events">{ruleEventCount}건</Row>}
         </dl>
       </div>
     );
@@ -53,101 +70,86 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
   const catConfig = category ? CATEGORY_CONFIG[category] : null;
   const typeConfig = TYPE_CONFIG[event.type];
   const time = new Date(event.timestamp).toLocaleTimeString('ko-KR');
+  const detail = parseDetail(event.detail);
 
-  let parsedDetail: string | null = null;
-  if (event.detail) {
-    try {
-      parsedDetail = JSON.stringify(JSON.parse(event.detail), null, 2);
-    } catch {
-      parsedDetail = event.detail;
-    }
-  }
+  const hasActivity = event.message || event.summary || event.result || event.prompt;
 
   return (
-    <div className="flex flex-col gap-3 p-3 text-sm overflow-y-auto">
-      <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">이벤트 상세</h4>
-      <div className={`font-medium ${typeConfig?.color ?? 'text-foreground'}`}>
-        {event.action || event.type.replace(/_/g, ' ')}
+    <div className="flex flex-col p-4 overflow-y-auto">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-1">
+        {typeConfig && <span className={`text-lg ${typeConfig.color}`}>{typeConfig.icon}</span>}
+        <span className="text-base font-bold text-foreground">
+          {event.action || event.type.replace(/_/g, ' ')}
+        </span>
       </div>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-xs">
-        <dt className="text-muted-foreground">분류</dt>
-        <dd className="text-foreground">
-          {catConfig?.label ?? '-'} &rsaquo; {event.type.replace(/_/g, ' ')}
-        </dd>
-        <dt className="text-muted-foreground">시간</dt>
-        <dd className="text-foreground font-mono">{time}</dd>
+
+      {/* Details section */}
+      <SectionTitle>Details</SectionTitle>
+      <dl>
+        <Row label="Type">
+          <span className={typeConfig?.color ?? 'text-foreground'}>
+            {catConfig?.label ?? '-'} &rsaquo; {event.type.replace(/_/g, ' ')}
+          </span>
+        </Row>
+        <Row label="Time"><span className="font-mono text-xs">{time}</span></Row>
         {event.file && (
-          <>
-            <dt className="text-muted-foreground">파일</dt>
-            <dd className="text-foreground break-all">{event.file}{event.line ? `:${event.line}` : ''}</dd>
-          </>
+          <Row label="File">
+            <span className="font-mono text-xs">{event.file}{event.line ? `:${event.line}` : ''}</span>
+          </Row>
         )}
         {event.rule_id && (
-          <>
-            <dt className="text-muted-foreground">규칙</dt>
-            <dd className="text-foreground font-mono">{event.rule_id}</dd>
-          </>
+          <Row label="Rule"><span className="font-mono text-xs">{event.rule_id}</span></Row>
         )}
-        {event.severity && (
-          <>
-            <dt className="text-muted-foreground">심각도</dt>
-            <dd className="text-foreground">{event.severity}</dd>
-          </>
-        )}
+        {event.severity && <Row label="Severity">{event.severity}</Row>}
         {event.task_id && (
-          <>
-            <dt className="text-muted-foreground">작업 ID</dt>
-            <dd className="text-foreground font-mono text-[10px]">{event.task_id}</dd>
-          </>
+          <Row label="Task ID"><span className="font-mono text-[10px]">{event.task_id}</span></Row>
         )}
-        {event.agent && (
-          <>
-            <dt className="text-muted-foreground">에이전트</dt>
-            <dd className="text-foreground">{event.agent}</dd>
-          </>
-        )}
-        {event.duration_ms != null && (
-          <>
-            <dt className="text-muted-foreground">소요시간</dt>
-            <dd className="text-foreground">{event.duration_ms}ms</dd>
-          </>
-        )}
+        {event.agent && <Row label="Agent">{event.agent}</Row>}
+        {event.duration_ms != null && <Row label="Duration">{event.duration_ms}ms</Row>}
+
+        {/* Parsed detail JSON fields */}
+        {detail && Object.entries(detail).map(([key, value]) => (
+          <Row key={key} label={key}>
+            {value.length > 120
+              ? <span className="font-mono text-xs">{value}</span>
+              : value}
+          </Row>
+        ))}
       </dl>
-      {event.prompt && (
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">prompt</div>
-          <div className="text-xs text-foreground bg-purple-50 dark:bg-purple-950/30 rounded p-2 whitespace-pre-wrap break-words">
-            {event.prompt}
-          </div>
-        </div>
-      )}
-      {event.message && (
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">reason</div>
-          <p className="text-xs text-foreground whitespace-pre-wrap break-words">{event.message}</p>
-        </div>
-      )}
-      {event.summary && (
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">summary</div>
-          <p className="text-xs text-foreground whitespace-pre-wrap break-words">{event.summary}</p>
-        </div>
-      )}
-      {event.result && (
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">result</div>
-          <pre className="text-xs text-foreground bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
-            {event.result}
-          </pre>
-        </div>
-      )}
-      {parsedDetail && (
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">detail</div>
-          <pre className="text-xs text-foreground bg-muted/50 rounded p-2 overflow-x-auto whitespace-pre-wrap break-all max-h-48">
-            {parsedDetail}
-          </pre>
-        </div>
+
+      {/* Activity section */}
+      {hasActivity && (
+        <>
+          <Divider />
+          <SectionTitle>Activity</SectionTitle>
+          <dl>
+            {event.message && (
+              <Row label="Reason">
+                <span className="font-normal whitespace-pre-wrap">{event.message}</span>
+              </Row>
+            )}
+            {event.summary && (
+              <Row label="Summary">
+                <span className="font-normal whitespace-pre-wrap">{event.summary}</span>
+              </Row>
+            )}
+            {event.prompt && (
+              <Row label="Prompt">
+                <span className="font-normal text-xs whitespace-pre-wrap bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1 inline-block">
+                  {event.prompt}
+                </span>
+              </Row>
+            )}
+            {event.result && (
+              <Row label="Result">
+                <pre className="font-mono text-xs whitespace-pre-wrap bg-muted/50 rounded px-2 py-1 max-h-48 overflow-y-auto">
+                  {event.result}
+                </pre>
+              </Row>
+            )}
+          </dl>
+        </>
       )}
     </div>
   );
