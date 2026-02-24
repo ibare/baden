@@ -35,7 +35,7 @@ export interface LaneInfo {
 export interface Connection {
   from: PlacedItem;
   to: PlacedItem;
-  type: 'rule_chain' | 'file_link';
+  type: 'rule_chain' | 'file_link' | 'task_chain';
 }
 
 /** Tick mark on the time axis */

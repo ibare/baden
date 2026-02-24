@@ -213,5 +213,21 @@ export function buildConnections(placed: PlacedItem[]): Connection[] {
     }
   }
 
+  // Task chain connections: same task_id, ordered by time
+  const byTask = new Map<string, PlacedItem[]>();
+  for (const p of placed) {
+    const taskId = p.event.task_id;
+    if (!taskId) continue;
+    if (!byTask.has(taskId)) byTask.set(taskId, []);
+    byTask.get(taskId)!.push(p);
+  }
+  for (const items of byTask.values()) {
+    if (items.length < 2) continue;
+    items.sort((a, b) => a.startMs - b.startMs);
+    for (let i = 0; i < items.length - 1; i++) {
+      connections.push({ from: items[i], to: items[i + 1], type: 'task_chain' });
+    }
+  }
+
   return connections;
 }
