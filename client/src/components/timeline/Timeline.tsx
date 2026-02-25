@@ -93,8 +93,6 @@ export function Timeline({
         selectedDate={selectedDate}
         onDateChange={onDateChange}
         isToday={isToday}
-        activeCategories={activeCategories}
-        onToggleCategory={onToggleCategory}
         search={search}
         onSearchChange={onSearchChange}
         zoomSec={zoomSec}

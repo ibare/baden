@@ -1,18 +1,13 @@
 import { memo, useCallback } from 'react';
-import type { EventCategory } from '@/lib/event-types';
-import { CATEGORY_CONFIG } from '@/lib/event-types';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { CaretLeft, CaretRight, MagnifyingGlass, MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react';
-import { CATEGORY_ORDER, SLIDER_MIN_SEC, SLIDER_MAX_SEC, SLIDER_STEP_SEC } from './lib/constants';
-import { CATEGORY_BUTTON_CLASSES } from './lib/colors';
+import { SLIDER_MIN_SEC, SLIDER_MAX_SEC, SLIDER_STEP_SEC } from './lib/constants';
 
 interface TimelineFilterBarProps {
   selectedDate: string;
   onDateChange: (date: string) => void;
   isToday: boolean;
-  activeCategories: Set<EventCategory>;
-  onToggleCategory: (cat: EventCategory) => void;
   search: string;
   onSearchChange: (s: string) => void;
   zoomSec: number;
@@ -34,8 +29,6 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
   selectedDate,
   onDateChange,
   isToday,
-  activeCategories,
-  onToggleCategory,
   search,
   onSearchChange,
   zoomSec,
@@ -72,32 +65,6 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
         >
           <CaretRight size={16} />
         </button>
-        {isToday && <span className="text-xs text-primary ml-1">LIVE</span>}
-      </div>
-
-      <div className="w-px h-5 bg-border" />
-
-      {/* Category toggles */}
-      <div className="flex items-center gap-1">
-        {CATEGORY_ORDER.map((cat) => {
-          const config = CATEGORY_CONFIG[cat];
-          const colors = CATEGORY_BUTTON_CLASSES[cat];
-          const isActive = activeCategories.has(cat);
-          return (
-            <button
-              key={cat}
-              onClick={() => onToggleCategory(cat)}
-              className={cn(
-                'px-2 py-0.5 text-xs rounded-full border transition-colors',
-                isActive
-                  ? `${colors.bg} ${colors.text} border-transparent`
-                  : 'text-muted-foreground border-border hover:border-muted-foreground/50',
-              )}
-            >
-              {config.label}
-            </button>
-          );
-        })}
       </div>
 
       <div className="w-px h-5 bg-border" />
