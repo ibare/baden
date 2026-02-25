@@ -238,7 +238,7 @@ export function formatGapDuration(durationMs: number): string {
   const hours = Math.floor(totalMin / 60);
   const minutes = totalMin % 60;
 
-  if (hours > 0 && minutes > 0) return `⋯ ${hours}h ${minutes}m`;
-  if (hours > 0) return `⋯ ${hours}h`;
-  return `⋯ ${minutes}m`;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${minutes}m`;
 }

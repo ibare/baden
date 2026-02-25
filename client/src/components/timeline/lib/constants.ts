@@ -8,6 +8,7 @@ export const BAR_HEIGHT = 22;
 export const LANE_GAP = 6;
 export const MARKER_SIZE = 10;
 export const MIN_BAR_WIDTH_PX = 4;
+export const ICON_MIN_WIDTH_PX = 20;
 export const TEXT_MIN_WIDTH_PX = 50;
 export const INSTANT_THRESHOLD_MS = 5000;
 export const MAX_SUB_ROWS = 8;
@@ -31,6 +32,7 @@ export const CLUSTER_PADDING_MS = 30_000;           // 클러스터 앞뒤 30초
 
 // Category ordering
 export const CATEGORY_ORDER: EventCategory[] = [
+  'user',
   'exploration',
   'planning',
   'implementation',

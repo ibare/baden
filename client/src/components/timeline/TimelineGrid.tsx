@@ -33,8 +33,8 @@ export const TimelineGrid = memo(function TimelineGrid({
             x2={0}
             y2={6}
             stroke="currentColor"
-            strokeOpacity={0.12}
-            strokeWidth={1.5}
+            strokeOpacity={0.10}
+            strokeWidth={7}
           />
         </pattern>
       </defs>

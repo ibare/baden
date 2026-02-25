@@ -48,25 +48,12 @@ export const TimelineSVG = memo(function TimelineSVG({
   isDragging,
 }: TimelineSVGProps) {
   const [hoveredItem, setHoveredItem] = useState<PlacedItem | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   const handleHover = useCallback(
-    (item: PlacedItem | null, e?: React.MouseEvent) => {
+    (item: PlacedItem | null) => {
       setHoveredItem(item);
-      if (e && item) {
-        const container = scrollContainerRef.current;
-        if (container) {
-          const rect = container.getBoundingClientRect();
-          setTooltipPos({
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top,
-          });
-        }
-      } else {
-        setTooltipPos(null);
-      }
     },
-    [scrollContainerRef],
+    [],
   );
 
   const handleClick = useCallback(
@@ -126,7 +113,7 @@ export const TimelineSVG = memo(function TimelineSVG({
           isToday={isToday}
         />
       </svg>
-      <TimelineTooltip item={hoveredItem} position={tooltipPos} />
+      <TimelineTooltip item={hoveredItem} scrollContainerRef={scrollContainerRef} />
     </div>
   );
 });

@@ -10,6 +10,14 @@ export interface CategoryColors {
 }
 
 export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
+  user: {
+    fill: '#60a5fa',
+    fillHover: '#3b82f6',
+    stroke: '#2563eb',
+    text: '#1d4ed8',
+    bg: 'rgba(96,165,250,0.08)',
+    connector: '#60a5fa',
+  },
   exploration: {
     fill: '#2dd4bf',
     fillHover: '#14b8a6',
@@ -65,6 +73,7 @@ export const CATEGORY_BUTTON_CLASSES: Record<
   EventCategory,
   { bg: string; hover: string; text: string }
 > = {
+  user: { bg: 'bg-blue-400/70', hover: 'hover:bg-blue-400/90', text: 'text-blue-700' },
   exploration: { bg: 'bg-teal-400/70', hover: 'hover:bg-teal-400/90', text: 'text-teal-700' },
   planning: { bg: 'bg-purple-400/70', hover: 'hover:bg-purple-400/90', text: 'text-purple-700' },
   implementation: {

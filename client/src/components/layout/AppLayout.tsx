@@ -56,7 +56,7 @@ export function AppLayout() {
   // Timeline filters
   const [selectedDate, setSelectedDate] = useState(todayUTC);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
-    new Set(['exploration', 'planning', 'implementation', 'verification', 'debugging', 'rule_compliance']),
+    new Set(['user', 'exploration', 'planning', 'implementation', 'verification', 'debugging', 'rule_compliance']),
   );
   const [search, setSearch] = useState('');
 
@@ -167,7 +167,8 @@ export function AppLayout() {
   // Filter events for timeline
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
-      const cat = EVENT_CATEGORY_MAP[e.type];
+      // prompt 이벤트는 user 카테고리로 분류
+      const cat = e.prompt ? 'user' : EVENT_CATEGORY_MAP[e.type];
       if (cat && !activeCategories.has(cat)) return false;
       if (search) {
         const s = search.toLowerCase();

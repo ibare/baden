@@ -38,7 +38,7 @@ export function useTimelineLayout(
     );
 
     return sorted.map((e, i) => {
-      const cat = EVENT_CATEGORY_MAP[e.type] || 'exploration';
+      const cat: EventCategory = e.prompt ? 'user' : (EVENT_CATEGORY_MAP[e.type] || 'exploration');
       const startMs = new Date(e.timestamp).getTime();
       let endMs: number;
       let truncated = false;

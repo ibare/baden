@@ -1,13 +1,16 @@
 import { memo, useState, useCallback } from 'react';
 import type { PlacedItem } from './lib/types';
-import { BAR_HEIGHT, TEXT_MIN_WIDTH_PX } from './lib/constants';
+import { BAR_HEIGHT, ICON_MIN_WIDTH_PX, TEXT_MIN_WIDTH_PX } from './lib/constants';
 import { CATEGORY_COLORS } from './lib/colors';
+import { EVENT_TYPE_ICONS, USER_ICON } from './lib/event-icons';
 
 interface TimelineBarProps {
   item: PlacedItem;
   onClick: (item: PlacedItem) => void;
-  onHover: (item: PlacedItem | null, e?: React.MouseEvent) => void;
+  onHover: (item: PlacedItem | null) => void;
 }
+
+const ICON_SIZE = 14;
 
 export const TimelineBar = memo(function TimelineBar({
   item,
@@ -19,18 +22,24 @@ export const TimelineBar = memo(function TimelineBar({
   const clipId = `bar-clip-${item.id}`;
   const maskId = `bar-mask-${item.id}`;
   const truncated = item.truncated && !item.isInstant && item.width >= 40;
+  const hasPrompt = !!item.event.prompt;
+
+  const showIcon = item.width >= ICON_MIN_WIDTH_PX;
+  const showText = item.width >= TEXT_MIN_WIDTH_PX;
+  const needClip = showIcon;
+
+  const IconComponent = hasPrompt ? USER_ICON : EVENT_TYPE_ICONS[item.event.type];
 
   const label =
     item.event.action || item.event.type.replace(/_/g, ' ');
   const fileName = item.event.file
     ? item.event.file.split('/').pop() || ''
     : '';
-  const showText = item.width >= TEXT_MIN_WIDTH_PX;
 
   const handleMouseEnter = useCallback(
-    (e: React.MouseEvent) => {
+    () => {
       setHovered(true);
-      onHover(item, e);
+      onHover(item);
     },
     [item, onHover],
   );
@@ -44,6 +53,13 @@ export const TimelineBar = memo(function TimelineBar({
     onClick(item);
   }, [item, onClick]);
 
+  // Icon position
+  const iconX = showText ? item.x + 4 : item.x + (item.width - ICON_SIZE) / 2;
+  const iconY = item.y + (BAR_HEIGHT - ICON_SIZE) / 2;
+
+  // Text offset (after icon)
+  const textX = showIcon ? item.x + 4 + ICON_SIZE + 3 : item.x + 4;
+
   return (
     <g
       data-timeline-item
@@ -52,7 +68,7 @@ export const TimelineBar = memo(function TimelineBar({
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
     >
-      {showText && (
+      {needClip && (
         <clipPath id={clipId}>
           <rect x={item.x} y={item.y} width={item.width} height={BAR_HEIGHT} rx={3} />
         </clipPath>
@@ -73,7 +89,6 @@ export const TimelineBar = memo(function TimelineBar({
           }
           return d;
         };
-        // Shape between the two wavy lines (gap region)
         const leftWavy = buildWavy(-2.5);
         let rightWavyReverse = `M${cx + 2.5},${by}`;
         for (let i = segments - 1; i >= 0; i--) {
@@ -89,18 +104,32 @@ export const TimelineBar = memo(function TimelineBar({
           </mask>
         );
       })()}
+      {/* Main bar */}
       <rect
         x={item.x}
         y={item.y}
         width={item.width}
         height={BAR_HEIGHT}
         rx={3}
-        fill={hovered ? colors.fillHover : colors.fill}
-        fillOpacity={0.75}
-        stroke={hovered ? colors.stroke : 'none'}
-        strokeWidth={hovered ? 1 : 0}
+        fill={hasPrompt ? '#fff' : hovered ? colors.fillHover : colors.fill}
+        fillOpacity={hasPrompt ? 1 : 0.75}
+        stroke={hasPrompt ? colors.fill : hovered ? colors.stroke : 'none'}
+        strokeWidth={hasPrompt ? 1.5 : hovered ? 1 : 0}
+        strokeDasharray={hasPrompt ? '4 2' : undefined}
         mask={truncated ? `url(#${maskId})` : undefined}
       />
+      {/* Prompt: top accent line */}
+      {hasPrompt && (
+        <line
+          x1={item.x + 3}
+          y1={item.y}
+          x2={item.x + item.width - 3}
+          y2={item.y}
+          stroke={colors.fill}
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
+      )}
       {truncated && (() => {
         const cx = item.x + item.width - 28;
         const ty = item.y - 2;
@@ -124,9 +153,23 @@ export const TimelineBar = memo(function TimelineBar({
           </>
         );
       })()}
+      {/* Icon via foreignObject */}
+      {showIcon && IconComponent && (
+        <foreignObject
+          x={iconX}
+          y={iconY}
+          width={ICON_SIZE}
+          height={ICON_SIZE}
+          clipPath={`url(#${clipId})`}
+          style={{ pointerEvents: 'none' }}
+        >
+          <IconComponent size={ICON_SIZE} weight="bold" color={colors.text} />
+        </foreignObject>
+      )}
+      {/* Text label */}
       {showText && (
         <text
-          x={item.x + 4}
+          x={textX}
           y={item.y + BAR_HEIGHT / 2}
           dominantBaseline="central"
           fontSize={10}

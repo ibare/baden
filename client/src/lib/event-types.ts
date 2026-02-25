@@ -1,4 +1,5 @@
 export type EventCategory =
+  | 'user'
   | 'exploration'
   | 'planning'
   | 'implementation'
@@ -74,6 +75,7 @@ export const EVENT_TYPE_GROUPS: EventTypeGroup[] = [
 ];
 
 export const CATEGORY_CONFIG: Record<EventCategory, { label: string; color: string }> = {
+  user: { label: '사용자', color: 'blue' },
   exploration: { label: '탐색', color: 'teal' },
   planning: { label: '계획', color: 'purple' },
   implementation: { label: '구현', color: 'orange' },

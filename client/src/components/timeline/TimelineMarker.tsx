@@ -6,7 +6,7 @@ import { CATEGORY_COLORS } from './lib/colors';
 interface TimelineMarkerProps {
   item: PlacedItem;
   onClick: (item: PlacedItem) => void;
-  onHover: (item: PlacedItem | null, e?: React.MouseEvent) => void;
+  onHover: (item: PlacedItem | null) => void;
 }
 
 export const TimelineMarker = memo(function TimelineMarker({
@@ -23,9 +23,9 @@ export const TimelineMarker = memo(function TimelineMarker({
   const points = `${cx},${cy - half} ${cx + half},${cy} ${cx},${cy + half} ${cx - half},${cy}`;
 
   const handleMouseEnter = useCallback(
-    (e: React.MouseEvent) => {
+    () => {
       setHovered(true);
-      onHover(item, e);
+      onHover(item);
     },
     [item, onHover],
   );

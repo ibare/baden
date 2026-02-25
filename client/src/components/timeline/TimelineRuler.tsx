@@ -37,8 +37,7 @@ export const TimelineRuler = memo(function TimelineRuler({
               y={0}
               width={seg.pxWidth}
               height={TIME_AXIS_HEIGHT}
-              fill="currentColor"
-              fillOpacity={0.06}
+              fill="#444"
             />
           ))}
 
@@ -51,8 +50,7 @@ export const TimelineRuler = memo(function TimelineRuler({
                   y={TIME_AXIS_HEIGHT / 2 + 1}
                   textAnchor="middle"
                   dominantBaseline="middle"
-                  fill="currentColor"
-                  fillOpacity={0.5}
+                  fill="#eee"
                   fontSize={9}
                   fontFamily="monospace"
                   fontWeight={600}

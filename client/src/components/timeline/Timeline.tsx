@@ -121,7 +121,7 @@ export function Timeline({
             className="absolute top-1/2 -translate-y-1/2 pointer-events-none"
             style={{ left: nowLabelLeft }}
           >
-            <span className="text-[9px] font-bold text-red-500 -translate-x-1/2 block">
+            <span className="text-[9px] font-bold text-white bg-red-500 rounded-full px-1.5 py-0.5 -translate-x-1/2 block leading-none">
               NOW
             </span>
           </div>

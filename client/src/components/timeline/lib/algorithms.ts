@@ -90,6 +90,7 @@ export function computeLanes(
   let y = 0;
 
   const categoryLabels: Record<EventCategory, string> = {
+    user: '사용자',
     exploration: '탐색',
     planning: '계획',
     implementation: '구현',
