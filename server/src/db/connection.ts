@@ -104,6 +104,17 @@ if (hasTaskId.cnt === 0) {
   console.log('[DB] Migration complete: new columns added');
 }
 
+// Migration: convert old datetime('now') timestamps to ISO 8601
+const oldTimestamp = db.prepare("SELECT id FROM events WHERE timestamp NOT LIKE '%T%' LIMIT 1").get();
+if (oldTimestamp) {
+  console.log('[DB] Migrating: converting timestamps to ISO 8601...');
+  db.exec(`
+    UPDATE events SET timestamp = replace(timestamp, ' ', 'T') || '.000Z'
+    WHERE timestamp NOT LIKE '%T%';
+  `);
+  console.log('[DB] Migration complete: timestamps converted');
+}
+
 db.pragma('foreign_keys = ON');
 
 export default db;

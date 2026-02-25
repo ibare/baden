@@ -70,10 +70,6 @@ eventsRouter.get('/', (req, res) => {
   const sql = `SELECT * FROM events ${where} ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
   params.push(Number(limit), Number(offset));
 
-  const events = db.prepare(sql).all(...params) as Record<string, unknown>[];
-  // SQLite datetime('now')는 UTC지만 'Z' 접미사가 없으므로 명시적으로 추가
-  res.json(events.map((e) => ({
-    ...e,
-    timestamp: e.timestamp ? `${e.timestamp}Z` : e.timestamp,
-  })));
+  const events = db.prepare(sql).all(...params);
+  res.json(events);
 });
