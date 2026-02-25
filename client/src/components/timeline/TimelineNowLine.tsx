@@ -1,5 +1,4 @@
 import { memo, useEffect, useState } from 'react';
-import { TIME_AXIS_HEIGHT } from './lib/constants';
 import { msToX } from './lib/algorithms';
 
 interface TimelineNowLineProps {

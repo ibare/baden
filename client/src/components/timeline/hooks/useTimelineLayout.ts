@@ -8,7 +8,6 @@ import {
   MAX_GAP_DURATION_MS,
   DEFAULT_LAST_DURATION_MS,
   LANE_GAP,
-  TIME_AXIS_HEIGHT,
 } from '../lib/constants';
 import { computeLanes, placeItems, assignSubRows } from '../lib/algorithms';
 
@@ -130,7 +129,7 @@ export function useTimelineLayout(
     const lastLane = lanes[lanes.length - 1];
     const totalHeight = lastLane
       ? lastLane.y + lastLane.height + LANE_GAP
-      : TIME_AXIS_HEIGHT + 100;
+      : 100;
 
     const rangeMs = rangeEnd - rangeStart;
     const totalWidth = Math.max((rangeMs / 60000) * ppm, viewportWidth);

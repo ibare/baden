@@ -1,7 +1,7 @@
 import type { Project } from '@/lib/api';
 import { CreateProjectDialog } from '@/components/domain/CreateProjectDialog';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Plus } from 'lucide-react';
+import { FolderOpen, Plus } from '@phosphor-icons/react';
 
 interface SidebarProps {
   projects: Project[];
@@ -17,7 +17,7 @@ export function Sidebar({
   onProjectCreated,
 }: SidebarProps) {
   return (
-    <aside className="w-56 flex-shrink-0 border-r border-border bg-card/50 flex flex-col h-full">
+    <aside className="min-w-[14rem] w-56 flex-shrink-0 border-r border-border bg-card/50 flex flex-col h-full">
       <div className="px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
         프로젝트
       </div>
@@ -36,7 +36,7 @@ export function Sidebar({
                   : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
               )}
             >
-              <FolderOpen className="size-4 flex-shrink-0" />
+              <FolderOpen size={16} className="flex-shrink-0" />
               <span className="truncate">{p.name}</span>
             </button>
           );
@@ -52,7 +52,7 @@ export function Sidebar({
       <div className="p-2 border-t border-border">
         <CreateProjectDialog onCreated={onProjectCreated}>
           <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors">
-            <Plus className="size-4" />
+            <Plus size={16} />
             프로젝트 추가
           </button>
         </CreateProjectDialog>

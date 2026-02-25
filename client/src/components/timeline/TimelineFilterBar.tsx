@@ -1,10 +1,10 @@
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import type { EventCategory } from '@/lib/event-types';
 import { CATEGORY_CONFIG } from '@/lib/event-types';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
-import { CATEGORY_ORDER } from './lib/constants';
+import { CaretLeft, CaretRight, MagnifyingGlass, MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react';
+import { CATEGORY_ORDER, SLIDER_MIN_SEC, SLIDER_MAX_SEC, SLIDER_STEP_SEC } from './lib/constants';
 import { CATEGORY_BUTTON_CLASSES } from './lib/colors';
 
 interface TimelineFilterBarProps {
@@ -15,6 +15,8 @@ interface TimelineFilterBarProps {
   onToggleCategory: (cat: EventCategory) => void;
   search: string;
   onSearchChange: (s: string) => void;
+  zoomSec: number;
+  onZoomChange: (sec: number) => void;
 }
 
 function shiftDate(dateStr: string, delta: number): string {
@@ -36,7 +38,16 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
   onToggleCategory,
   search,
   onSearchChange,
+  zoomSec,
+  onZoomChange,
 }: TimelineFilterBarProps) {
+  const handleSlider = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      onZoomChange(parseFloat(e.target.value));
+    },
+    [onZoomChange],
+  );
+
   return (
     <div className="flex items-center gap-3 px-4 py-2 border-b border-border flex-shrink-0">
       {/* Date navigation */}
@@ -45,7 +56,7 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
           onClick={() => onDateChange(shiftDate(selectedDate, -1))}
           className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ChevronLeft className="size-4" />
+          <CaretLeft size={16} />
         </button>
         <span
           className={cn(
@@ -59,7 +70,7 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
           onClick={() => onDateChange(shiftDate(selectedDate, 1))}
           className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ChevronRight className="size-4" />
+          <CaretRight size={16} />
         </button>
         {isToday && <span className="text-xs text-primary ml-1">LIVE</span>}
       </div>
@@ -92,8 +103,8 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
       <div className="w-px h-5 bg-border" />
 
       {/* Search */}
-      <div className="relative flex-1 max-w-xs">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+      <div className="relative max-w-xs">
+        <MagnifyingGlass size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
           placeholder="검색..."
@@ -101,6 +112,34 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
           onChange={(e) => onSearchChange(e.target.value)}
           className="h-7 text-xs pl-7"
         />
+      </div>
+
+      {/* Spacer */}
+      <div className="flex-1" />
+
+      {/* Zoom controls */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => onZoomChange(zoomSec - SLIDER_STEP_SEC)}
+          className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        >
+          <MagnifyingGlassPlus size={14} />
+        </button>
+        <input
+          type="range"
+          min={SLIDER_MIN_SEC}
+          max={SLIDER_MAX_SEC}
+          step={SLIDER_STEP_SEC}
+          value={zoomSec}
+          onChange={handleSlider}
+          className="w-[100px] h-1 accent-primary cursor-pointer"
+        />
+        <button
+          onClick={() => onZoomChange(zoomSec + SLIDER_STEP_SEC)}
+          className="p-0.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+        >
+          <MagnifyingGlassMinus size={14} />
+        </button>
       </div>
     </div>
   );

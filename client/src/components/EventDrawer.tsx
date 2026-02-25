@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react';
 import type { RuleEvent, Rule } from '@/lib/api';
 import { EventDetail } from '@/components/EventDetail';
 import { cn } from '@/lib/utils';
-import { X, Pin, PinOff } from 'lucide-react';
+import { X, PushPin, PushPinSlash } from '@phosphor-icons/react';
 
 interface EventDrawerProps {
   isOpen: boolean;
@@ -71,13 +71,13 @@ export function EventDrawer({
           )}
           title={pinned ? '고정 해제' : '사이드바 고정'}
         >
-          {pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+          {pinned ? <PushPinSlash size={14} /> : <PushPin size={14} />}
         </button>
         <button
           onClick={onClose}
           className="p-1 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
         >
-          <X className="size-4" />
+          <X size={16} />
         </button>
       </div>
     </div>

@@ -1,6 +1,5 @@
 import { memo } from 'react';
 import type { Tick, LaneInfo } from './lib/types';
-import { TIME_AXIS_HEIGHT } from './lib/constants';
 
 interface TimelineGridProps {
   ticks: Tick[];
@@ -20,26 +19,13 @@ export const TimelineGrid = memo(function TimelineGrid({
           {/* Grid line: major ticks stronger */}
           <line
             x1={tick.x}
-            y1={TIME_AXIS_HEIGHT}
+            y1={0}
             x2={tick.x}
             y2={totalHeight}
             stroke="currentColor"
             strokeOpacity={tick.isMajor ? 0.12 : 0.05}
             strokeWidth={1}
           />
-          {/* Label on every tick */}
-          <text
-            x={tick.x}
-            y={TIME_AXIS_HEIGHT - 8}
-            textAnchor="middle"
-            fill="currentColor"
-            fillOpacity={tick.isMajor ? 0.6 : 0.4}
-            fontSize={11}
-            fontFamily="monospace"
-            fontWeight={tick.isMajor ? 600 : 400}
-          >
-            {tick.label}
-          </text>
         </g>
       ))}
       {/* Lane backgrounds */}

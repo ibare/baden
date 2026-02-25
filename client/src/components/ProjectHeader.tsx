@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { Project } from '@/lib/api';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { ClipboardCopy, Check } from 'lucide-react';
+import { ClipboardText, Check } from '@phosphor-icons/react';
 
 interface ProjectHeaderProps {
   project: Project | null;
@@ -47,9 +47,9 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
         className="gap-1.5 flex-shrink-0"
       >
         {copied ? (
-          <Check className="size-3.5" />
+          <Check size={14} />
         ) : (
-          <ClipboardCopy className="size-3.5" />
+          <ClipboardText size={14} />
         )}
         {copied ? '복사됨' : '프로토콜 복사'}
       </Button>

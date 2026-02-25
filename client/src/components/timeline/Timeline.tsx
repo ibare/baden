@@ -7,7 +7,7 @@ import { useTimelineTicks } from './hooks/useTimelineTicks';
 import { useTimelineZoom } from './hooks/useTimelineZoom';
 import { useTimelineConnections } from './hooks/useTimelineConnections';
 import { TimelineFilterBar } from './TimelineFilterBar';
-import { TimelineZoomBar } from './TimelineZoomBar';
+import { TimelineRuler } from './TimelineRuler';
 import { TimelineLaneLabels } from './TimelineLaneLabels';
 import { TimelineSVG } from './TimelineSVG';
 
@@ -94,11 +94,13 @@ export function Timeline({
         onToggleCategory={onToggleCategory}
         search={search}
         onSearchChange={onSearchChange}
+        zoomSec={zoomSec}
+        onZoomChange={setZoomSec}
       />
 
-      {/* Zoom bar with NOW label overlay */}
+      {/* Sticky time ruler with NOW label overlay */}
       <div className="relative">
-        <TimelineZoomBar zoomSec={zoomSec} onZoomChange={setZoomSec} />
+        <TimelineRuler ticks={ticks} totalWidth={totalWidth} scrollLeft={scrollLeft} />
         {nowLabelLeft !== null && (
           <div
             className="absolute top-1/2 -translate-y-1/2 pointer-events-none"

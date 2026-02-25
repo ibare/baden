@@ -19,6 +19,7 @@ function todayUTC() {
 
 export function AppLayout() {
   const { projects, selectedProject, setSelectedProject, addProject } = useProject();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Data
   const [rules, setRules] = useState<Rule[]>([]);
@@ -183,18 +184,20 @@ export function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
-      <Sidebar
-        projects={projects}
-        selectedProject={selectedProject}
-        onSelectProject={setSelectedProject}
-        onProjectCreated={handleProjectCreated}
-      />
+      <div className={`${sidebarOpen ? 'w-56' : 'w-0'} transition-[width] duration-200 overflow-hidden flex-shrink-0`}>
+        <Sidebar
+          projects={projects}
+          selectedProject={selectedProject}
+          onSelectProject={setSelectedProject}
+          onProjectCreated={handleProjectCreated}
+        />
+      </div>
 
       {/* Main area + pinned drawer */}
       <div className="flex-1 flex min-w-0 min-h-0">
         {/* Main content */}
         <div className="flex-1 flex flex-col min-w-0">
-          <TopBar connected={connected} />
+          <TopBar connected={connected} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
           <ProjectHeader project={currentProject} />
 
           {selectedProject && (

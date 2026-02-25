@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus } from 'lucide-react';
+import { Plus } from '@phosphor-icons/react';
 
 interface CreateProjectDialogProps {
   onCreated: (project: Project) => void;

@@ -7,7 +7,6 @@ import {
   MARKER_SIZE,
   MIN_BAR_WIDTH_PX,
   MAX_SUB_ROWS,
-  TIME_AXIS_HEIGHT,
   CATEGORY_ORDER,
   RULER_SPACING_PX,
 } from './constants';
@@ -83,7 +82,7 @@ export function computeLanes(
   eventCounts?: Map<EventCategory, number>,
 ): LaneInfo[] {
   const lanes: LaneInfo[] = [];
-  let y = TIME_AXIS_HEIGHT;
+  let y = 0;
 
   const categoryLabels: Record<EventCategory, string> = {
     exploration: '탐색',
