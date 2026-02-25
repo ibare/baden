@@ -23,7 +23,10 @@ export function Timeline({
   onSearchChange,
   onSelectEvent,
 }: TimelineProps) {
-  const { zoomSec, setZoomSec, ppm, handleWheel, scrollContainerRef } = useTimelineZoom();
+  const {
+    zoomSec, setZoomSec, ppm, handleWheel, scrollContainerRef,
+    onPointerDown, onPointerMove, onPointerUp, isDragging,
+  } = useTimelineZoom();
   const [viewportWidth, setViewportWidth] = useState(800);
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
@@ -135,6 +138,10 @@ export function Timeline({
               onSelectItem={handleSelectItem}
               onWheel={handleWheel}
               scrollContainerRef={scrollContainerRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              isDragging={isDragging}
             />
           </>
         )}

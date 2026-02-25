@@ -41,6 +41,7 @@ export const TimelineMarker = memo(function TimelineMarker({
 
   return (
     <polygon
+      data-timeline-item
       points={points}
       fill={hovered ? colors.fillHover : colors.fill}
       stroke={hovered ? colors.stroke : colors.fill}

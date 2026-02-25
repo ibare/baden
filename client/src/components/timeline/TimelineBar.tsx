@@ -46,6 +46,7 @@ export const TimelineBar = memo(function TimelineBar({
 
   return (
     <g
+      data-timeline-item
       className="cursor-pointer"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

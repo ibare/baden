@@ -1,4 +1,4 @@
-import { memo, useCallback, useState, type WheelEvent } from 'react';
+import { memo, useCallback, useState, type WheelEvent, type PointerEvent } from 'react';
 import type { PlacedItem, LaneInfo, Tick, Connection } from './lib/types';
 import { TimelineGrid } from './TimelineGrid';
 import { TimelineBar } from './TimelineBar';
@@ -21,6 +21,10 @@ interface TimelineSVGProps {
   onSelectItem: (item: PlacedItem) => void;
   onWheel: (e: WheelEvent<HTMLDivElement>) => void;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+  onPointerDown: (e: PointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (e: PointerEvent<HTMLDivElement>) => void;
+  onPointerUp: () => void;
+  isDragging: boolean;
 }
 
 export const TimelineSVG = memo(function TimelineSVG({
@@ -37,6 +41,10 @@ export const TimelineSVG = memo(function TimelineSVG({
   onSelectItem,
   onWheel,
   scrollContainerRef,
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  isDragging,
 }: TimelineSVGProps) {
   const [hoveredItem, setHoveredItem] = useState<PlacedItem | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
@@ -72,8 +80,12 @@ export const TimelineSVG = memo(function TimelineSVG({
   return (
     <div
       ref={scrollContainerRef}
-      className="flex-1 overflow-x-scroll overflow-y-auto relative"
+      className={`flex-1 overflow-x-scroll overflow-y-auto relative ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
       onWheel={onWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerUp}
     >
       <svg
         width={svgWidth}
