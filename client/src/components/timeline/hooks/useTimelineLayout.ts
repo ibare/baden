@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { RuleEvent } from '@/lib/api';
 import type { EventCategory } from '@/lib/event-types';
 import { EVENT_CATEGORY_MAP } from '@/lib/event-types';
-import type { TimelineItem, PlacedItem, LaneInfo } from '../lib/types';
+import type { TimelineItem, PlacedItem, LaneInfo, CompressedTimeMap } from '../lib/types';
 import {
   INSTANT_THRESHOLD_MS,
   MAX_GAP_DURATION_MS,
@@ -10,6 +10,7 @@ import {
   LANE_GAP,
 } from '../lib/constants';
 import { computeLanes, placeItems, assignSubRows } from '../lib/algorithms';
+import { buildCompressedTimeMap } from '../lib/gap-compression';
 
 interface LayoutResult {
   items: TimelineItem[];
@@ -19,6 +20,7 @@ interface LayoutResult {
   rangeEnd: number;
   totalHeight: number;
   totalWidth: number;
+  timeMap: CompressedTimeMap;
 }
 
 export function useTimelineLayout(
@@ -104,7 +106,13 @@ export function useTimelineLayout(
     return { rangeStart: start, rangeEnd: end };
   }, [allEvents, selectedDate, ppm, viewportWidth]);
 
-  // Stage 3: Layout
+  // Stage 3: Build compressed time map
+  const timeMap = useMemo(() => {
+    const filteredItems = items.filter((i) => activeCategories.has(i.category));
+    return buildCompressedTimeMap(filteredItems, rangeStart, rangeEnd, ppm);
+  }, [items, activeCategories, rangeStart, rangeEnd, ppm]);
+
+  // Stage 4: Layout
   const { lanes, placed, totalHeight, totalWidth } = useMemo(() => {
     const byCategory = new Map<EventCategory, TimelineItem[]>();
     for (const item of items) {
@@ -116,7 +124,7 @@ export function useTimelineLayout(
     const subRowCounts = new Map<EventCategory, number>();
     const eventCounts = new Map<EventCategory, number>();
     for (const [cat, catItems] of byCategory) {
-      const results = assignSubRows(catItems, ppm);
+      const results = assignSubRows(catItems, ppm, timeMap);
       const maxRow = results.reduce((m, r) => Math.max(m, r.subRowCount), 1);
       subRowCounts.set(cat, maxRow);
       eventCounts.set(cat, catItems.length);
@@ -124,18 +132,17 @@ export function useTimelineLayout(
 
     const lanes = computeLanes(activeCategories, subRowCounts, eventCounts);
     const filteredItems = items.filter((i) => activeCategories.has(i.category));
-    const placed = placeItems(filteredItems, lanes, rangeStart, ppm);
+    const placed = placeItems(filteredItems, lanes, rangeStart, ppm, timeMap);
 
     const lastLane = lanes[lanes.length - 1];
     const totalHeight = lastLane
       ? lastLane.y + lastLane.height + LANE_GAP
       : 100;
 
-    const rangeMs = rangeEnd - rangeStart;
-    const totalWidth = Math.max((rangeMs / 60000) * ppm, viewportWidth);
+    const totalWidth = Math.max(timeMap.totalWidth, viewportWidth);
 
     return { lanes, placed, totalHeight, totalWidth };
-  }, [items, activeCategories, ppm, rangeStart, rangeEnd, viewportWidth]);
+  }, [items, activeCategories, ppm, rangeStart, rangeEnd, viewportWidth, timeMap]);
 
-  return { items, placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth };
+  return { items, placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth, timeMap };
 }

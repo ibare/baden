@@ -1,4 +1,4 @@
-import type { TimelineItem, PlacedItem, Connection, LaneInfo } from './types';
+import type { TimelineItem, PlacedItem, Connection, LaneInfo, CompressedTimeMap } from './types';
 import type { EventCategory } from '@/lib/event-types';
 import {
   SUB_ROW_HEIGHT,
@@ -18,6 +18,7 @@ import {
 export function assignSubRows(
   items: TimelineItem[],
   ppm: number,
+  timeMap?: CompressedTimeMap,
 ): { subRow: number; subRowCount: number }[] {
   // Sort by startMs
   const sorted = items.map((item, i) => ({ item, index: i }));
@@ -28,10 +29,14 @@ export function assignSubRows(
   const results = new Array<number>(items.length);
 
   for (const { item, index } of sorted) {
-    const startPx = msToX(item.startMs, 0, ppm);
+    const startPx = timeMap
+      ? timeMap.msToX(item.startMs)
+      : msToX(item.startMs, 0, ppm);
     const endPx = item.isInstant
       ? startPx + MARKER_SIZE + 2
-      : startPx + Math.max(MIN_BAR_WIDTH_PX, ((item.endMs - item.startMs) / 60000) * ppm);
+      : timeMap
+        ? startPx + timeMap.durationToWidth(item.startMs, item.endMs - item.startMs)
+        : startPx + Math.max(MIN_BAR_WIDTH_PX, ((item.endMs - item.startMs) / 60000) * ppm);
 
     let placed = false;
     for (let row = 0; row < subRowEnds.length && row < MAX_SUB_ROWS; row++) {
@@ -133,6 +138,7 @@ export function placeItems(
   lanes: LaneInfo[],
   rangeStart: number,
   ppm: number,
+  timeMap?: CompressedTimeMap,
 ): PlacedItem[] {
   const laneMap = new Map<EventCategory, number>();
   lanes.forEach((l, i) => laneMap.set(l.category, i));
@@ -151,15 +157,19 @@ export function placeItems(
     if (laneIdx === undefined) continue;
     const lane = lanes[laneIdx];
 
-    const subRowResults = assignSubRows(catItems, ppm);
+    const subRowResults = assignSubRows(catItems, ppm, timeMap);
 
     for (let i = 0; i < catItems.length; i++) {
       const item = catItems[i];
       const { subRow } = subRowResults[i];
-      const x = msToX(item.startMs, rangeStart, ppm);
+      const x = timeMap
+        ? timeMap.msToX(item.startMs)
+        : msToX(item.startMs, rangeStart, ppm);
       const width = item.isInstant
         ? MARKER_SIZE
-        : durationToWidth(item.endMs - item.startMs, ppm);
+        : timeMap
+          ? timeMap.durationToWidth(item.startMs, item.endMs - item.startMs)
+          : durationToWidth(item.endMs - item.startMs, ppm);
       const y = lane.y + subRow * SUB_ROW_HEIGHT + (SUB_ROW_HEIGHT - BAR_HEIGHT) / 2;
 
       placed.push({ ...item, lane: laneIdx, subRow, x, width, y });

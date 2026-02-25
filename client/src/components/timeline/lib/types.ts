@@ -45,6 +45,28 @@ export interface Tick {
   x: number;
   /** Major ticks get labels, minor ticks only get grid lines */
   isMajor: boolean;
+  /** True for gap separator ticks */
+  isGap?: boolean;
+}
+
+/** A contiguous time segment (active or compressed gap) */
+export interface TimeSegment {
+  startMs: number;
+  endMs: number;
+  isGap: boolean;
+  /** Pixel offset where this segment begins */
+  pxOffset: number;
+  /** Pixel width of this segment */
+  pxWidth: number;
+}
+
+/** Compressed time map that handles gap compression */
+export interface CompressedTimeMap {
+  segments: TimeSegment[];
+  msToX: (ms: number) => number;
+  xToMs: (x: number) => number;
+  durationToWidth: (startMs: number, durationMs: number) => number;
+  totalWidth: number;
 }
 
 /** Timeline props — same interface as before */

@@ -1,16 +1,16 @@
 import { memo, useEffect, useState } from 'react';
-import { msToX } from './lib/algorithms';
+import type { CompressedTimeMap } from './lib/types';
 
 interface TimelineNowLineProps {
+  timeMap: CompressedTimeMap;
   rangeStart: number;
-  ppm: number;
   totalHeight: number;
   isToday: boolean;
 }
 
 export const TimelineNowLine = memo(function TimelineNowLine({
+  timeMap,
   rangeStart,
-  ppm,
   totalHeight,
   isToday,
 }: TimelineNowLineProps) {
@@ -18,7 +18,6 @@ export const TimelineNowLine = memo(function TimelineNowLine({
 
   useEffect(() => {
     if (!isToday) return;
-    // Update every second for smooth movement
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [isToday]);
@@ -26,7 +25,7 @@ export const TimelineNowLine = memo(function TimelineNowLine({
   if (!isToday) return null;
   if (now < rangeStart) return null;
 
-  const x = msToX(now, rangeStart, ppm);
+  const x = timeMap.msToX(now);
 
   return (
     <g>

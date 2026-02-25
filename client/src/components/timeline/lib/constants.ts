@@ -24,6 +24,11 @@ export const DEFAULT_ZOOM_SEC = 60; // 1분
 export const MAX_GAP_DURATION_MS = 5 * 60_000;
 export const DEFAULT_LAST_DURATION_MS = 30_000;
 
+// Gap compression
+export const GAP_THRESHOLD_MS = 3 * 60_000;       // 3분 이상 빈 구간 → 압축
+export const COMPRESSED_GAP_PX = 40;               // 압축 gap 폭
+export const CLUSTER_PADDING_MS = 30_000;           // 클러스터 앞뒤 30초 여유
+
 // Category ordering
 export const CATEGORY_ORDER: EventCategory[] = [
   'exploration',

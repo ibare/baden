@@ -1,5 +1,5 @@
 import { memo, useCallback, useState, type WheelEvent, type PointerEvent } from 'react';
-import type { PlacedItem, LaneInfo, Tick, Connection } from './lib/types';
+import type { PlacedItem, LaneInfo, Tick, Connection, CompressedTimeMap } from './lib/types';
 import { TimelineGrid } from './TimelineGrid';
 import { TimelineBar } from './TimelineBar';
 import { TimelineMarker } from './TimelineMarker';
@@ -18,6 +18,7 @@ interface TimelineSVGProps {
   rangeStart: number;
   ppm: number;
   isToday: boolean;
+  timeMap: CompressedTimeMap;
   onSelectItem: (item: PlacedItem) => void;
   onWheel: (e: WheelEvent<HTMLDivElement>) => void;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -36,8 +37,8 @@ export const TimelineSVG = memo(function TimelineSVG({
   totalHeight,
   viewportWidth,
   rangeStart,
-  ppm,
   isToday,
+  timeMap,
   onSelectItem,
   onWheel,
   scrollContainerRef,
@@ -92,7 +93,12 @@ export const TimelineSVG = memo(function TimelineSVG({
         height={totalHeight}
         className="block"
       >
-        <TimelineGrid ticks={ticks} lanes={lanes} totalHeight={totalHeight} />
+        <TimelineGrid
+          ticks={ticks}
+          lanes={lanes}
+          totalHeight={totalHeight}
+          segments={timeMap.segments}
+        />
         <TimelineConnections connections={connections} />
         <g className="timeline-items">
           {placed.map((item) =>
@@ -114,8 +120,8 @@ export const TimelineSVG = memo(function TimelineSVG({
           )}
         </g>
         <TimelineNowLine
+          timeMap={timeMap}
           rangeStart={rangeStart}
-          ppm={ppm}
           totalHeight={totalHeight}
           isToday={isToday}
         />
