@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import { api } from '@/lib/api';
 import type { RuleEvent, Rule } from '@/lib/api';
@@ -7,7 +7,6 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { useProject } from '@/hooks/useProjectContext';
 import type { RootOutletContext } from './RootLayout';
 import { ProjectHeader } from '@/components/ProjectHeader';
-import { RuleHeatmap } from '@/components/RuleHeatmap';
 import { Timeline } from '@/components/timeline';
 import { EventDrawer } from '@/components/EventDrawer';
 
@@ -25,33 +24,6 @@ export function AppLayout() {
   const [rules, setRules] = useState<Rule[]>([]);
   const [events, setEvents] = useState<RuleEvent[]>([]);
   const [eventDates, setEventDates] = useState<string[]>([]);
-
-  // Resizable split
-  const [splitRatio, setSplitRatio] = useState(0.7);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDragging.current = true;
-    const onMove = (ev: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const ratio = (ev.clientY - rect.top) / rect.height;
-      setSplitRatio(Math.min(0.9, Math.max(0.2, ratio)));
-    };
-    const onUp = () => {
-      isDragging.current = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-    };
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, []);
 
   // Timeline filters
   const [selectedDate, setSelectedDate] = useState(todayUTC);
@@ -134,14 +106,6 @@ export function AppLayout() {
     [rules],
   );
 
-  const handleSelectRule = useCallback(
-    (rule: Rule, _eventCount: number) => {
-      setDrawerEvent(null);
-      setDrawerRule(rule);
-    },
-    [],
-  );
-
   const handleCloseDrawer = useCallback(() => {
     setDrawerEvent(null);
     setDrawerRule(null);
@@ -184,44 +148,23 @@ export function AppLayout() {
         <ProjectHeader project={currentProject} />
 
         {selectedProject && (
-          <div ref={containerRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
-            {/* Timeline */}
-            <div className="min-h-0 overflow-hidden" style={{ height: `${splitRatio * 100}%` }}>
-              <Timeline
-                events={filteredEvents}
-                allEvents={events}
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                eventDates={eventDates}
-                activeCategories={activeCategories}
-                onToggleCategory={toggleCategory}
-                search={search}
-                onSearchChange={setSearch}
-                onSelectEvent={handleSelectEvent}
-                resolveAction={resolveAction}
-                selectedEventId={drawerEvent?.id ?? null}
-              />
-            </div>
-
-            {/* Drag handle */}
-            <div
-              className="relative flex-shrink-0 h-0 z-10"
-              onMouseDown={handleDragStart}
-            >
-              <div className="absolute inset-x-0 -top-[6px] h-[12px] cursor-row-resize flex items-center justify-center">
-                <div className="w-10 h-[5px] rounded-full bg-border hover:bg-muted-foreground/40 transition-colors" />
-              </div>
-            </div>
-
-            {/* Rules */}
-            <div className="flex-1 min-h-0 border-t border-border">
-              <RuleHeatmap
-                rules={rules}
-                events={events}
-                selectedRuleId={drawerRule?.id ?? null}
-                onSelectRule={handleSelectRule}
-              />
-            </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <Timeline
+              events={filteredEvents}
+              allEvents={events}
+              rules={rules}
+              rawEvents={events}
+              selectedDate={selectedDate}
+              onDateChange={setSelectedDate}
+              eventDates={eventDates}
+              activeCategories={activeCategories}
+              onToggleCategory={toggleCategory}
+              search={search}
+              onSearchChange={setSearch}
+              onSelectEvent={handleSelectEvent}
+              resolveAction={resolveAction}
+              selectedEventId={drawerEvent?.id ?? null}
+            />
           </div>
         )}
       </div>

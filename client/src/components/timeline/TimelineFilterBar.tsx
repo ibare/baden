@@ -2,8 +2,10 @@ import { memo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { CaretLeft, CaretRight, Crosshair, MagnifyingGlass, MagnifyingGlassPlus, MagnifyingGlassMinus, Rows } from '@phosphor-icons/react';
+import type { RuleEvent } from '@/lib/api';
 import type { ExpandLevel } from './lib/constants';
 import { SLIDER_MIN_SEC, SLIDER_MAX_SEC, SLIDER_STEP_SEC } from './lib/constants';
+import { RuleStrip } from './RuleStrip';
 
 interface TimelineFilterBarProps {
   selectedDate: string;
@@ -11,6 +13,9 @@ interface TimelineFilterBarProps {
   isToday: boolean;
   search: string;
   onSearchChange: (s: string) => void;
+  events: RuleEvent[];
+  panelOpen: boolean;
+  onTogglePanel: () => void;
   expandLevel: ExpandLevel;
   onCycleExpand: () => void;
   zoomSec: number;
@@ -36,6 +41,9 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
   isToday,
   search,
   onSearchChange,
+  events,
+  panelOpen,
+  onTogglePanel,
   expandLevel,
   onCycleExpand,
   zoomSec,
@@ -89,6 +97,14 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
           className="h-7 text-xs pl-7"
         />
       </div>
+
+      {/* Rule Strip */}
+      <div className="w-px h-5 bg-border" />
+      <RuleStrip
+        events={events}
+        panelOpen={panelOpen}
+        onTogglePanel={onTogglePanel}
+      />
 
       {/* Spacer */}
       <div className="flex-1" />

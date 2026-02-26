@@ -1,4 +1,4 @@
-import type { RuleEvent } from '@/lib/api';
+import type { RuleEvent, Rule } from '@/lib/api';
 import type { EventCategory } from '@/lib/event-types';
 import type { ResolvedAction } from '@/hooks/useActionRegistry';
 
@@ -79,10 +79,12 @@ export interface CompressedTimeMap {
   totalWidth: number;
 }
 
-/** Timeline props — same interface as before */
+/** Timeline props */
 export interface TimelineProps {
   events: RuleEvent[];
   allEvents: RuleEvent[];
+  rules: Rule[];
+  rawEvents: RuleEvent[];
   selectedDate: string;
   onDateChange: (date: string) => void;
   eventDates: string[];
