@@ -21,6 +21,7 @@ interface TimelineSVGProps {
   isToday: boolean;
   expandLevel: ExpandLevel;
   timeMap: CompressedTimeMap;
+  selectedEventId?: string | null;
   onSelectItem: (item: PlacedItem) => void;
   onWheel: (e: WheelEvent<HTMLDivElement>) => void;
   scrollContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -42,6 +43,7 @@ export const TimelineSVG = memo(function TimelineSVG({
   isToday,
   expandLevel,
   timeMap,
+  selectedEventId,
   onSelectItem,
   onWheel,
   scrollContainerRef,
@@ -96,6 +98,7 @@ export const TimelineSVG = memo(function TimelineSVG({
               <TimelineMarker
                 key={item.id}
                 item={item}
+                selected={item.id === selectedEventId}
                 onClick={handleClick}
                 onHover={handleHover}
               />
@@ -104,6 +107,7 @@ export const TimelineSVG = memo(function TimelineSVG({
                 key={item.id}
                 item={item}
                 expandLevel={expandLevel}
+                selected={item.id === selectedEventId}
                 onClick={handleClick}
                 onHover={handleHover}
               />

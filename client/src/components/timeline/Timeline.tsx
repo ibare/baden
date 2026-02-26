@@ -24,6 +24,7 @@ export function Timeline({
   onSearchChange,
   onSelectEvent,
   resolveAction,
+  selectedEventId,
 }: TimelineProps) {
   const {
     zoomSec, setZoomSec, ppm, handleWheel, scrollContainerRef,
@@ -155,6 +156,7 @@ export function Timeline({
                 isToday={isToday}
                 expandLevel={expandLevel}
                 timeMap={timeMap}
+                selectedEventId={selectedEventId}
                 onSelectItem={handleSelectItem}
                 onWheel={handleWheel}
                 scrollContainerRef={scrollContainerRef}

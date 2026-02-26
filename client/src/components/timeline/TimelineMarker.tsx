@@ -5,12 +5,14 @@ import { CATEGORY_COLORS } from './lib/colors';
 
 interface TimelineMarkerProps {
   item: PlacedItem;
+  selected?: boolean;
   onClick: (item: PlacedItem) => void;
   onHover: (item: PlacedItem | null) => void;
 }
 
 export const TimelineMarker = memo(function TimelineMarker({
   item,
+  selected,
   onClick,
   onHover,
 }: TimelineMarkerProps) {
@@ -44,8 +46,8 @@ export const TimelineMarker = memo(function TimelineMarker({
       data-timeline-item
       points={points}
       fill={hovered ? colors.fillHover : colors.fill}
-      stroke={hovered ? colors.stroke : colors.fill}
-      strokeWidth={1.5}
+      stroke={(selected || hovered) ? colors.stroke : colors.fill}
+      strokeWidth={(selected || hovered) ? 2 : 1.5}
       className="cursor-pointer"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

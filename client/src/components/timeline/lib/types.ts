@@ -92,4 +92,5 @@ export interface TimelineProps {
   onSearchChange: (s: string) => void;
   onSelectEvent: (event: RuleEvent) => void;
   resolveAction?: (action: string | null, type: string) => ResolvedAction;
+  selectedEventId?: string | null;
 }

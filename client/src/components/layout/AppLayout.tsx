@@ -199,6 +199,7 @@ export function AppLayout() {
                 onSearchChange={setSearch}
                 onSelectEvent={handleSelectEvent}
                 resolveAction={resolveAction}
+                selectedEventId={drawerEvent?.id ?? null}
               />
             </div>
 

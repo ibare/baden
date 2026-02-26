@@ -9,6 +9,7 @@ import { PHOSPHOR_ICON_MAP } from './lib/icon-map';
 interface TimelineBarProps {
   item: PlacedItem;
   expandLevel: ExpandLevel;
+  selected?: boolean;
   onClick: (item: PlacedItem) => void;
   onHover: (item: PlacedItem | null) => void;
 }
@@ -18,6 +19,7 @@ const ICON_SIZE = 14;
 export const TimelineBar = memo(function TimelineBar({
   item,
   expandLevel,
+  selected,
   onClick,
   onHover,
 }: TimelineBarProps) {
@@ -142,8 +144,8 @@ export const TimelineBar = memo(function TimelineBar({
         rx={3}
         fill={hasPrompt ? '#fff' : hovered ? colors.fillHover : colors.fill}
         fillOpacity={hasPrompt ? 1 : 0.75}
-        stroke={hasPrompt ? colors.fill : hovered ? colors.stroke : 'none'}
-        strokeWidth={hasPrompt ? 1.5 : hovered ? 1 : 0}
+        stroke={hasPrompt ? colors.fill : (selected || hovered) ? colors.stroke : 'none'}
+        strokeWidth={hasPrompt ? 1.5 : (selected || hovered) ? 1.5 : 0}
         strokeDasharray={hasPrompt ? '4 2' : undefined}
         mask={truncated ? `url(#${maskId})` : undefined}
       />
