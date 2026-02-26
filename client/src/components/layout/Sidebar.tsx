@@ -1,7 +1,8 @@
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Project } from '@/lib/api';
 import { CreateProjectDialog } from '@/components/domain/CreateProjectDialog';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Plus } from '@phosphor-icons/react';
+import { FolderOpen, Plus, Monitor, Sliders } from '@phosphor-icons/react';
 
 interface SidebarProps {
   projects: Project[];
@@ -16,9 +17,39 @@ export function Sidebar({
   onSelectProject,
   onProjectCreated,
 }: SidebarProps) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const navItems = [
+    { path: '/', label: '모니터', icon: Monitor },
+    { path: '/registry', label: 'Action Registry', icon: Sliders },
+  ];
+
   return (
     <aside className="min-w-[14rem] w-56 flex-shrink-0 border-r border-border bg-card/50 flex flex-col h-full">
-      <div className="px-3 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+      {/* Navigation */}
+      <nav className="px-2 pt-2 pb-1 space-y-0.5">
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <button
+              key={item.path}
+              onClick={() => navigate(item.path)}
+              className={cn(
+                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors text-left',
+                isActive
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+              )}
+            >
+              <item.icon size={16} className="flex-shrink-0" />
+              <span className="truncate">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-t border-border mt-1">
         프로젝트
       </div>
 

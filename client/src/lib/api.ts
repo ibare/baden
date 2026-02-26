@@ -52,6 +52,30 @@ export interface RuleEvent {
   task_id: string | null;
 }
 
+export interface ActionRegistryEntry {
+  id: number;
+  project_id: string;
+  pattern: string;
+  pattern_type: 'exact' | 'wildcard';
+  category: string | null;
+  label: string | null;
+  icon: string | null;
+  confirmed: number;
+  sample_count: number;
+  first_seen: string;
+  last_seen: string;
+}
+
+export interface ActionPrefix {
+  id: number;
+  project_id: string;
+  prefix: string;
+  category: string;
+  label: string;
+  icon: string | null;
+  sort_order: number;
+}
+
 export const api = {
   getProjects: () => request<Project[]>('/projects'),
   getProject: (id: string) => request<Project & { rules: Rule[] }>(`/projects/${id}`),
@@ -73,4 +97,54 @@ export const api = {
 
   createProject: (data: { name: string; description?: string; rulesPath: string }) =>
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Action Registry
+  getActionRegistry: (projectId: string) =>
+    request<ActionRegistryEntry[]>(`/projects/${projectId}/action-registry`),
+
+  updateRegistryEntry: (projectId: string, id: number, data: Partial<Pick<ActionRegistryEntry, 'category' | 'label' | 'icon' | 'confirmed' | 'pattern_type'>>) =>
+    request<ActionRegistryEntry>(`/projects/${projectId}/action-registry/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  createRegistryEntry: (projectId: string, data: { pattern: string; pattern_type: string; category?: string; label?: string; icon?: string }) =>
+    request<ActionRegistryEntry>(`/projects/${projectId}/action-registry`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  deleteRegistryEntry: (projectId: string, id: number) =>
+    request<{ ok: boolean }>(`/projects/${projectId}/action-registry/${id}`, { method: 'DELETE' }),
+
+  bulkConfirmRegistry: (projectId: string, ids: number[]) =>
+    request<{ confirmed: number }>(`/projects/${projectId}/action-registry/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
+  testRegistryPattern: (projectId: string, pattern: string, patternType: string) =>
+    request<{ matches: string[] }>(`/projects/${projectId}/action-registry/test`, {
+      method: 'POST',
+      body: JSON.stringify({ pattern, pattern_type: patternType }),
+    }),
+
+  // Action Prefixes
+  getPrefixes: (projectId: string) =>
+    request<ActionPrefix[]>(`/projects/${projectId}/action-registry/prefixes`),
+
+  createPrefix: (projectId: string, data: { prefix: string; category: string; label: string; icon?: string | null }) =>
+    request<ActionPrefix>(`/projects/${projectId}/action-registry/prefixes`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updatePrefix: (projectId: string, id: number, data: Partial<Pick<ActionPrefix, 'prefix' | 'category' | 'label' | 'icon' | 'sort_order'>>) =>
+    request<ActionPrefix>(`/projects/${projectId}/action-registry/prefixes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deletePrefix: (projectId: string, id: number) =>
+    request<{ ok: boolean }>(`/projects/${projectId}/action-registry/prefixes/${id}`, { method: 'DELETE' }),
 };

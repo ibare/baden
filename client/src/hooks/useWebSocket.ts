@@ -4,14 +4,17 @@ import type { RuleEvent } from '@/lib/api';
 interface UseWebSocketOptions {
   projectId?: string;
   onEvent?: (event: RuleEvent) => void;
+  onRegistryUpdate?: () => void;
 }
 
-export function useWebSocket({ projectId, onEvent }: UseWebSocketOptions = {}) {
+export function useWebSocket({ projectId, onEvent, onRegistryUpdate }: UseWebSocketOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const onEventRef = useRef(onEvent);
+  const onRegistryUpdateRef = useRef(onRegistryUpdate);
   const [connected, setConnected] = useState(false);
 
   onEventRef.current = onEvent;
+  onRegistryUpdateRef.current = onRegistryUpdate;
 
   const connect = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -28,6 +31,8 @@ export function useWebSocket({ projectId, onEvent }: UseWebSocketOptions = {}) {
         const msg = JSON.parse(e.data);
         if (msg.type === 'event' && msg.data) {
           onEventRef.current?.(msg.data);
+        } else if (msg.type === 'registry_update') {
+          onRegistryUpdateRef.current?.();
         }
       } catch {
         // ignore parse errors

@@ -1,5 +1,6 @@
 import type { RuleEvent } from '@/lib/api';
 import type { EventCategory } from '@/lib/event-types';
+import type { ResolvedAction } from '@/hooks/useActionRegistry';
 
 /** Raw timeline item converted from RuleEvent */
 export interface TimelineItem {
@@ -11,6 +12,12 @@ export interface TimelineItem {
   isInstant: boolean;
   /** Duration was capped at MAX_GAP — actual end time unknown */
   truncated: boolean;
+  /** Icon name resolved from action registry */
+  resolvedIcon?: string | null;
+  /** Prefix label (e.g. "추가") */
+  resolvedLabel?: string;
+  /** Detail keyword (e.g. "[json]") */
+  resolvedDetail?: string;
 }
 
 /** Item placed in a lane + sub-row with pixel coordinates */
@@ -81,4 +88,5 @@ export interface TimelineProps {
   search: string;
   onSearchChange: (s: string) => void;
   onSelectEvent: (event: RuleEvent) => void;
+  resolveAction?: (action: string | null, type: string) => ResolvedAction;
 }

@@ -3,6 +3,7 @@ import type { PlacedItem } from './lib/types';
 import { BAR_HEIGHT, ICON_MIN_WIDTH_PX, TEXT_MIN_WIDTH_PX } from './lib/constants';
 import { CATEGORY_COLORS } from './lib/colors';
 import { EVENT_TYPE_ICONS, USER_ICON } from './lib/event-icons';
+import { PHOSPHOR_ICON_MAP } from './lib/icon-map';
 
 interface TimelineBarProps {
   item: PlacedItem;
@@ -25,16 +26,17 @@ export const TimelineBar = memo(function TimelineBar({
   const hasPrompt = !!item.event.prompt;
 
   const showIcon = item.width >= ICON_MIN_WIDTH_PX;
-  const showText = item.width >= TEXT_MIN_WIDTH_PX;
+  const showDetail = item.width >= TEXT_MIN_WIDTH_PX;   // 50px: detail visible
+  const showLabel = item.width >= 90;                    // 90px: label also visible
   const needClip = showIcon;
 
-  const IconComponent = hasPrompt ? USER_ICON : EVENT_TYPE_ICONS[item.event.type];
+  const IconComponent = hasPrompt
+    ? USER_ICON
+    : (item.resolvedIcon && PHOSPHOR_ICON_MAP[item.resolvedIcon])
+      || EVENT_TYPE_ICONS[item.event.type];
 
-  const label =
-    item.event.action || item.event.type.replace(/_/g, ' ');
-  const fileName = item.event.file
-    ? item.event.file.split('/').pop() || ''
-    : '';
+  const label = item.resolvedLabel || item.event.action || item.event.type.replace(/_/g, ' ');
+  const detailText = item.resolvedDetail || '';
 
   const handleMouseEnter = useCallback(
     () => {
@@ -53,8 +55,10 @@ export const TimelineBar = memo(function TimelineBar({
     onClick(item);
   }, [item, onClick]);
 
+  const showAnyText = showLabel || showDetail;
+
   // Icon position
-  const iconX = showText ? item.x + 4 : item.x + (item.width - ICON_SIZE) / 2;
+  const iconX = showAnyText ? item.x + 4 : item.x + (item.width - ICON_SIZE) / 2;
   const iconY = item.y + (BAR_HEIGHT - ICON_SIZE) / 2;
 
   // Text offset (after icon)
@@ -166,8 +170,8 @@ export const TimelineBar = memo(function TimelineBar({
           <IconComponent size={ICON_SIZE} weight="bold" color={colors.text} />
         </foreignObject>
       )}
-      {/* Text label */}
-      {showText && (
+      {/* Text: disappear order — label first, then detail, then icon */}
+      {showAnyText && (
         <text
           x={textX}
           y={item.y + BAR_HEIGHT / 2}
@@ -176,14 +180,15 @@ export const TimelineBar = memo(function TimelineBar({
           fill={colors.text}
           fontWeight={500}
           clipPath={`url(#${clipId})`}
+          style={{ userSelect: 'none' }}
         >
-          {label}
-          {fileName && (
-            <tspan fillOpacity={0.7} fontWeight={400}>
-              {' '}
-              {fileName}
+          {showLabel && label}
+          {showDetail && detailText && (
+            <tspan fillOpacity={showLabel ? 0.5 : 0.8} fontWeight={400} fontSize={9}>
+              {showLabel ? ' ' : ''}{detailText}
             </tspan>
           )}
+          {showDetail && !detailText && !showLabel && label}
         </text>
       )}
     </g>

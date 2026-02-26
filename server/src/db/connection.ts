@@ -115,6 +115,122 @@ if (oldTimestamp) {
   console.log('[DB] Migration complete: timestamps converted');
 }
 
+// Migration: create action_registry table
+const hasActionRegistry = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='action_registry'").get();
+if (!hasActionRegistry) {
+  console.log('[DB] Migrating: creating action_registry table...');
+  db.exec(`
+    CREATE TABLE action_registry (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      pattern TEXT NOT NULL,
+      pattern_type TEXT NOT NULL DEFAULT 'exact',
+      category TEXT,
+      label TEXT,
+      icon TEXT,
+      confirmed INTEGER NOT NULL DEFAULT 0,
+      sample_count INTEGER NOT NULL DEFAULT 0,
+      first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+      last_seen TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(project_id, pattern)
+    );
+    CREATE INDEX idx_action_registry_project ON action_registry(project_id);
+  `);
+  console.log('[DB] Migration complete: action_registry table created');
+}
+
+// Migration: create action_prefixes table
+const hasActionPrefixes = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='action_prefixes'").get();
+if (!hasActionPrefixes) {
+  console.log('[DB] Migrating: creating action_prefixes table...');
+  db.exec(`
+    CREATE TABLE action_prefixes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      prefix TEXT NOT NULL,
+      category TEXT NOT NULL,
+      label TEXT NOT NULL,
+      icon TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(project_id, prefix)
+    );
+  `);
+
+  // Seed from existing wildcard entries if any projects exist
+  const projectRows = db.prepare("SELECT id FROM projects").all() as { id: string }[];
+  if (projectRows.length > 0) {
+    console.log('[DB] Seeding action_prefixes from wildcard patterns...');
+    const seedData: { prefix: string; category: string; label: string; icon: string | null }[] = [
+      // exploration
+      { prefix: 'read', category: 'exploration', label: '읽기', icon: 'BookOpen' },
+      { prefix: 'search', category: 'exploration', label: '검색', icon: 'MagnifyingGlass' },
+      { prefix: 'find', category: 'exploration', label: '찾기', icon: 'MagnifyingGlass' },
+      { prefix: 'check', category: 'exploration', label: '확인', icon: 'Eye' },
+      { prefix: 'list', category: 'exploration', label: '목록', icon: 'List' },
+      { prefix: 'get', category: 'exploration', label: '조회', icon: 'Eye' },
+      { prefix: 'view', category: 'exploration', label: '보기', icon: 'Eye' },
+      // planning
+      { prefix: 'plan', category: 'planning', label: '계획', icon: 'MapTrifold' },
+      { prefix: 'analyze', category: 'planning', label: '분석', icon: 'ChartLine' },
+      { prefix: 'analysis', category: 'planning', label: '분석', icon: 'ChartLine' },
+      { prefix: 'decide', category: 'planning', label: '결정', icon: 'GitBranch' },
+      { prefix: 'design', category: 'planning', label: '설계', icon: 'PencilRuler' },
+      { prefix: 'evaluate', category: 'planning', label: '평가', icon: 'Scales' },
+      // implementation
+      { prefix: 'add', category: 'implementation', label: '추가', icon: 'Plus' },
+      { prefix: 'create', category: 'implementation', label: '생성', icon: 'FilePlus' },
+      { prefix: 'update', category: 'implementation', label: '수정', icon: 'PencilSimple' },
+      { prefix: 'modify', category: 'implementation', label: '변경', icon: 'PencilSimple' },
+      { prefix: 'remove', category: 'implementation', label: '제거', icon: 'Minus' },
+      { prefix: 'delete', category: 'implementation', label: '삭제', icon: 'Trash' },
+      { prefix: 'refactor', category: 'implementation', label: '리팩터', icon: 'ArrowsClockwise' },
+      { prefix: 'implement', category: 'implementation', label: '구현', icon: 'Code' },
+      { prefix: 'write', category: 'implementation', label: '작성', icon: 'PencilLine' },
+      { prefix: 'configure', category: 'implementation', label: '설정', icon: 'Gear' },
+      { prefix: 'set', category: 'implementation', label: '설정', icon: 'Gear' },
+      { prefix: 'install', category: 'implementation', label: '설치', icon: 'Download' },
+      { prefix: 'move', category: 'implementation', label: '이동', icon: 'ArrowRight' },
+      { prefix: 'rename', category: 'implementation', label: '이름변경', icon: 'TextAa' },
+      // verification
+      { prefix: 'test', category: 'verification', label: '테스트', icon: 'Flask' },
+      { prefix: 'verify', category: 'verification', label: '검증', icon: 'CheckCircle' },
+      { prefix: 'validate', category: 'verification', label: '유효성', icon: 'ShieldCheck' },
+      { prefix: 'run', category: 'verification', label: '실행', icon: 'Play' },
+      { prefix: 'build', category: 'verification', label: '빌드', icon: 'Hammer' },
+      // debugging
+      { prefix: 'fix', category: 'debugging', label: '수정', icon: 'Wrench' },
+      { prefix: 'debug', category: 'debugging', label: '디버그', icon: 'Bug' },
+      { prefix: 'resolve', category: 'debugging', label: '해결', icon: 'CheckCircle' },
+      // rule_compliance
+      { prefix: 'apply', category: 'rule_compliance', label: '적용', icon: 'Check' },
+      { prefix: 'enforce', category: 'rule_compliance', label: '강제', icon: 'Shield' },
+      // misc
+      { prefix: 'review', category: 'planning', label: '검토', icon: 'MagnifyingGlassPlus' },
+      { prefix: 'report', category: 'verification', label: '보고', icon: 'FileText' },
+      { prefix: 'deliver', category: 'implementation', label: '전달', icon: 'PaperPlaneRight' },
+      { prefix: 'completed', category: 'verification', label: '완료', icon: 'CheckCircle' },
+      { prefix: 'task', category: 'planning', label: '작업', icon: 'ClipboardText' },
+      { prefix: 'invoke', category: 'implementation', label: '호출', icon: 'Lightning' },
+      { prefix: 'invoke_rule', category: 'rule_compliance', label: '규칙호출', icon: 'BookBookmark' },
+    ];
+    const insertPrefix = db.prepare(`
+      INSERT OR IGNORE INTO action_prefixes (project_id, prefix, category, label, icon, sort_order)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const tx = db.transaction(() => {
+      for (const proj of projectRows) {
+        seedData.forEach((s, idx) => {
+          insertPrefix.run(proj.id, s.prefix, s.category, s.label, s.icon, idx);
+        });
+      }
+    });
+    tx();
+    console.log(`[DB] Seeded ${seedData.length} prefixes for ${projectRows.length} project(s)`);
+  }
+
+  console.log('[DB] Migration complete: action_prefixes table created');
+}
+
 db.pragma('foreign_keys = ON');
 
 export default db;

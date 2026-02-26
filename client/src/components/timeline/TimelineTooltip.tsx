@@ -3,6 +3,7 @@ import type { PlacedItem } from './lib/types';
 import { BAR_HEIGHT } from './lib/constants';
 import { CATEGORY_COLORS } from './lib/colors';
 import { EVENT_TYPE_ICONS, USER_ICON } from './lib/event-icons';
+import { PHOSPHOR_ICON_MAP } from './lib/icon-map';
 
 interface TimelineTooltipProps {
   item: PlacedItem | null;
@@ -69,7 +70,10 @@ export const TimelineTooltip = memo(function TimelineTooltip({
   const line = item.event.line;
   const ruleId = item.event.rule_id;
   const hasPrompt = !!prompt;
-  const IconComponent = hasPrompt ? USER_ICON : EVENT_TYPE_ICONS[item.event.type];
+  const IconComponent = hasPrompt
+    ? USER_ICON
+    : (item.resolvedIcon && PHOSPHOR_ICON_MAP[item.resolvedIcon])
+      || EVENT_TYPE_ICONS[item.event.type];
 
   // Don't show action if it's the same as type (header already shows it)
   const action = rawAction && rawAction !== item.event.type ? rawAction : null;
@@ -113,7 +117,7 @@ export const TimelineTooltip = memo(function TimelineTooltip({
             <IconComponent size={14} weight="bold" color={colors.text} className="flex-shrink-0" />
           )}
           <span className="font-semibold text-foreground truncate">
-            {humanType(item.event.type)}
+            {item.resolvedLabel || humanType(item.event.type)}
           </span>
           <div className="flex items-center gap-1 ml-auto flex-shrink-0">
             {hasPrompt && (

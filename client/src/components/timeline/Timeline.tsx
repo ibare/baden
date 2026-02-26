@@ -22,6 +22,7 @@ export function Timeline({
   search,
   onSearchChange,
   onSelectEvent,
+  resolveAction,
 }: TimelineProps) {
   const {
     zoomSec, setZoomSec, ppm, handleWheel, scrollContainerRef,
@@ -70,7 +71,7 @@ export function Timeline({
   }, [isToday]);
 
   const { placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth, timeMap } =
-    useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth);
+    useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth, resolveAction);
 
   const ticks = useTimelineTicks(rangeStart, rangeEnd, ppm, zoomSec, timeMap);
   const connections = useTimelineConnections(placed);

@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { api } from '@/lib/api';
-import type { RuleEvent, Rule, Project } from '@/lib/api';
+import type { RuleEvent, Rule } from '@/lib/api';
 import type { EventCategory } from '@/lib/event-types';
-import { EVENT_CATEGORY_MAP } from '@/lib/event-types';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useProject } from '@/hooks/useProjectContext';
-import { TopBar } from '@/components/layout/TopBar';
-import { Sidebar } from '@/components/layout/Sidebar';
+import type { RootOutletContext } from './RootLayout';
 import { ProjectHeader } from '@/components/ProjectHeader';
 import { RuleHeatmap } from '@/components/RuleHeatmap';
 import { Timeline } from '@/components/timeline';
@@ -18,8 +17,9 @@ function todayUTC() {
 }
 
 export function AppLayout() {
-  const { projects, selectedProject, setSelectedProject, addProject } = useProject();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { projects, selectedProject } = useProject();
+  const { resolveAction, resolveCategory, refreshRegistry, setConnected } =
+    useOutletContext<RootOutletContext>();
 
   // Data
   const [rules, setRules] = useState<Rule[]>([]);
@@ -27,7 +27,7 @@ export function AppLayout() {
   const [eventDates, setEventDates] = useState<string[]>([]);
 
   // Resizable split
-  const [splitRatio, setSplitRatio] = useState(0.7); // Timeline takes 70%
+  const [splitRatio, setSplitRatio] = useState(0.7);
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
@@ -82,7 +82,6 @@ export function AppLayout() {
     api.getRules(selectedProject).then(setRules).catch(console.error);
     api.getEventDates(selectedProject).then((dates) => {
       setEventDates(dates);
-      // If today has no events, pick the most recent date that does
       if (dates.length > 0 && !dates.includes(todayUTC())) {
         setSelectedDate(dates[0]);
       } else {
@@ -106,7 +105,6 @@ export function AppLayout() {
       if (selectedDate === todayUTC()) {
         setEvents((prev) => [event, ...prev]);
       }
-      // Also refresh date list
       setEventDates((prev) => {
         const d = event.timestamp.slice(0, 10);
         return prev.includes(d) ? prev : [d, ...prev];
@@ -118,7 +116,13 @@ export function AppLayout() {
   const { connected } = useWebSocket({
     projectId: selectedProject || undefined,
     onEvent: handleWsEvent,
+    onRegistryUpdate: refreshRegistry,
   });
+
+  // Sync connection status up to RootLayout
+  useEffect(() => {
+    setConnected(connected);
+  }, [connected, setConnected]);
 
   // Handlers
   const handleSelectEvent = useCallback(
@@ -147,14 +151,6 @@ export function AppLayout() {
     setDrawerPinned((prev) => !prev);
   }, []);
 
-  const handleProjectCreated = useCallback(
-    (project: Project) => {
-      addProject(project);
-      setSelectedProject(project.id);
-    },
-    [addProject, setSelectedProject],
-  );
-
   const toggleCategory = useCallback((cat: EventCategory) => {
     setActiveCategories((prev) => {
       const next = new Set(prev);
@@ -167,8 +163,7 @@ export function AppLayout() {
   // Filter events for timeline
   const filteredEvents = useMemo(() => {
     return events.filter((e) => {
-      // prompt 이벤트는 user 카테고리로 분류
-      const cat = e.prompt ? 'user' : EVENT_CATEGORY_MAP[e.type];
+      const cat = e.prompt ? 'user' : resolveCategory(e.action, e.type);
       if (cat && !activeCategories.has(cat)) return false;
       if (search) {
         const s = search.toLowerCase();
@@ -180,82 +175,69 @@ export function AppLayout() {
       }
       return true;
     });
-  }, [events, activeCategories, search]);
+  }, [events, activeCategories, search, resolveCategory]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
-      <div className={`${sidebarOpen ? 'w-56' : 'w-0'} transition-[width] duration-200 overflow-hidden flex-shrink-0`}>
-        <Sidebar
-          projects={projects}
-          selectedProject={selectedProject}
-          onSelectProject={setSelectedProject}
-          onProjectCreated={handleProjectCreated}
-        />
-      </div>
+    <div className="flex-1 flex min-w-0 min-h-0">
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <ProjectHeader project={currentProject} />
 
-      {/* Main area + pinned drawer */}
-      <div className="flex-1 flex min-w-0 min-h-0">
-        {/* Main content */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <TopBar connected={connected} sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
-          <ProjectHeader project={currentProject} />
+        {selectedProject && (
+          <div ref={containerRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+            {/* Timeline */}
+            <div className="min-h-0 overflow-hidden" style={{ height: `${splitRatio * 100}%` }}>
+              <Timeline
+                events={filteredEvents}
+                allEvents={events}
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                eventDates={eventDates}
+                activeCategories={activeCategories}
+                onToggleCategory={toggleCategory}
+                search={search}
+                onSearchChange={setSearch}
+                onSelectEvent={handleSelectEvent}
+                resolveAction={resolveAction}
+              />
+            </div>
 
-          {selectedProject && (
-            <div ref={containerRef} className="flex-1 min-h-0 flex flex-col overflow-hidden">
-              {/* Timeline */}
-              <div className="min-h-0 overflow-hidden" style={{ height: `${splitRatio * 100}%` }}>
-                <Timeline
-                  events={filteredEvents}
-                  allEvents={events}
-                  selectedDate={selectedDate}
-                  onDateChange={setSelectedDate}
-                  eventDates={eventDates}
-                  activeCategories={activeCategories}
-                  onToggleCategory={toggleCategory}
-                  search={search}
-                  onSearchChange={setSearch}
-                  onSelectEvent={handleSelectEvent}
-                />
-              </div>
-
-              {/* Drag handle */}
-              <div
-                className="relative flex-shrink-0 h-0 z-10"
-                onMouseDown={handleDragStart}
-              >
-                <div className="absolute inset-x-0 -top-[6px] h-[12px] cursor-row-resize flex items-center justify-center">
-                  <div className="w-10 h-[5px] rounded-full bg-border hover:bg-muted-foreground/40 transition-colors" />
-                </div>
-              </div>
-
-              {/* Rules */}
-              <div className="flex-1 min-h-0 border-t border-border">
-                <RuleHeatmap
-                  rules={rules}
-                  events={events}
-                  selectedRuleId={drawerRule?.id ?? null}
-                  onSelectRule={handleSelectRule}
-                />
+            {/* Drag handle */}
+            <div
+              className="relative flex-shrink-0 h-0 z-10"
+              onMouseDown={handleDragStart}
+            >
+              <div className="absolute inset-x-0 -top-[6px] h-[12px] cursor-row-resize flex items-center justify-center">
+                <div className="w-10 h-[5px] rounded-full bg-border hover:bg-muted-foreground/40 transition-colors" />
               </div>
             </div>
-          )}
-        </div>
 
-        {/* Pinned sidebar (in-flow) */}
-        {drawerPinned && (
-          <EventDrawer
-            isOpen={!!(drawerEvent || drawerRule)}
-            event={drawerEvent}
-            rule={drawerRule}
-            pinned={drawerPinned}
-            pinnedWidth={drawerWidth}
-            onClose={handleCloseDrawer}
-            onTogglePin={handleTogglePin}
-            onWidthChange={setDrawerWidth}
-          />
+            {/* Rules */}
+            <div className="flex-1 min-h-0 border-t border-border">
+              <RuleHeatmap
+                rules={rules}
+                events={events}
+                selectedRuleId={drawerRule?.id ?? null}
+                onSelectRule={handleSelectRule}
+              />
+            </div>
+          </div>
         )}
       </div>
+
+      {/* Pinned sidebar (in-flow) */}
+      {drawerPinned && (
+        <EventDrawer
+          isOpen={!!(drawerEvent || drawerRule)}
+          event={drawerEvent}
+          rule={drawerRule}
+          pinned={drawerPinned}
+          pinnedWidth={drawerWidth}
+          onClose={handleCloseDrawer}
+          onTogglePin={handleTogglePin}
+          onWidthChange={setDrawerWidth}
+        />
+      )}
 
       {/* Overlay drawer (not pinned) */}
       {!drawerPinned && (

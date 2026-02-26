@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { RuleEvent } from '@/lib/api';
 import type { EventCategory } from '@/lib/event-types';
 import { EVENT_CATEGORY_MAP } from '@/lib/event-types';
+import type { ResolvedAction } from '@/hooks/useActionRegistry';
 import type { TimelineItem, PlacedItem, LaneInfo, CompressedTimeMap } from '../lib/types';
 import {
   INSTANT_THRESHOLD_MS,
@@ -30,6 +31,7 @@ export function useTimelineLayout(
   activeCategories: Set<EventCategory>,
   ppm: number,
   viewportWidth: number,
+  resolveAction?: (action: string | null, type: string) => ResolvedAction,
 ): LayoutResult {
   // Stage 1: Convert RuleEvents → TimelineItems
   const items = useMemo((): TimelineItem[] => {
@@ -38,7 +40,12 @@ export function useTimelineLayout(
     );
 
     return sorted.map((e, i) => {
-      const cat: EventCategory = e.prompt ? 'user' : (EVENT_CATEGORY_MAP[e.type] || 'exploration');
+      const resolved = resolveAction ? resolveAction(e.action, e.type) : null;
+      const cat: EventCategory = e.prompt
+        ? 'user'
+        : resolved
+          ? resolved.category
+          : (EVENT_CATEGORY_MAP[e.type] || 'exploration');
       const startMs = new Date(e.timestamp).getTime();
       let endMs: number;
       let truncated = false;
@@ -60,10 +67,13 @@ export function useTimelineLayout(
       }
 
       const isInstant = endMs - startMs < INSTANT_THRESHOLD_MS;
+      const resolvedIcon = resolved?.icon ?? null;
+      const resolvedLabel = resolved?.label;
+      const resolvedDetail = resolved?.keyword ? `[${resolved.keyword}]` : undefined;
 
-      return { id: e.id, event: e, category: cat, startMs, endMs, isInstant, truncated };
+      return { id: e.id, event: e, category: cat, startMs, endMs, isInstant, truncated, resolvedIcon, resolvedLabel, resolvedDetail };
     });
-  }, [events]);
+  }, [events, resolveAction]);
 
   // Stage 2: Compute time range — ensure it covers at least the viewport width
   const { rangeStart, rangeEnd } = useMemo(() => {

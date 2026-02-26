@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import db from '../db/connection.js';
 import { broadcast } from '../ws.js';
+import { registerAction } from './action-registry.js';
 import type { EventInput, RuleEvent } from '../types.js';
 
 const insertEvent = db.prepare(`
@@ -41,6 +42,10 @@ export function processEvent(input: EventInput): RuleEvent {
   const event: RuleEvent = row as unknown as RuleEvent;
 
   broadcast(event, input.projectId);
+
+  if (input.action && input.projectId) {
+    registerAction(input.projectId, input.action);
+  }
 
   return event;
 }

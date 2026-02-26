@@ -20,3 +20,14 @@ export function broadcast(event: unknown, projectId: string): void {
     }
   }
 }
+
+export function broadcastRegistryUpdate(projectId: string): void {
+  const message = JSON.stringify({ type: 'registry_update', projectId });
+  for (const [ws, filter] of clients) {
+    if (ws.readyState === WebSocket.OPEN) {
+      if (!filter.projectId || filter.projectId === projectId) {
+        ws.send(message);
+      }
+    }
+  }
+}

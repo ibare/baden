@@ -8,6 +8,7 @@ import { addClient, removeClient } from './ws.js';
 import { projectsRouter } from './routes/projects.js';
 import { eventsRouter } from './routes/events.js';
 import { queryRouter } from './routes/query.js';
+import { actionRegistryRouter } from './routes/action-registry.js';
 
 const PORT = 3800;
 
@@ -33,6 +34,7 @@ console.log('[Baden] Database initialized');
 app.use('/api/projects', projectsRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/query', queryRouter);
+app.use('/api/projects/:projectId/action-registry', actionRegistryRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
