@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -172,6 +172,20 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
   const [ruleTitle, setRuleTitle] = useState<string | null>(null);
   const [ruleBody, setRuleBody] = useState<string | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
+  const [taskReason, setTaskReason] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTaskReason(null);
+    if (!event?.task_id || event.prompt) return;
+
+    let cancelled = false;
+    api.getEvents({ taskId: event.task_id }).then((events) => {
+      if (cancelled) return;
+      const promptEvent = events.find((e) => e.prompt !== null);
+      setTaskReason(promptEvent?.message ?? null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [event?.task_id, event?.prompt]);
 
   const handleFileClick = async () => {
     if (!rule) return;
@@ -251,6 +265,16 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
           {event.action || event.type.replace(/_/g, ' ')}
         </span>
       </div>
+
+      {/* Task reason banner */}
+      {taskReason && (
+        <div className="flex items-start gap-2 rounded-md bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/40 px-3 py-2 mb-2">
+          <span className="text-purple-500 shrink-0 mt-0.5 text-sm">▸</span>
+          <p className="text-xs text-purple-700 dark:text-purple-300 whitespace-pre-wrap leading-relaxed">
+            {taskReason}
+          </p>
+        </div>
+      )}
 
       {/* Details section */}
       <SectionTitle>Details</SectionTitle>
