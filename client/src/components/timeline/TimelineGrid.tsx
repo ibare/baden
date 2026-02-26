@@ -1,5 +1,6 @@
 import { memo } from 'react';
 import type { Tick, LaneInfo, TimeSegment } from './lib/types';
+import { LANE_PAD_TOP, LANE_PAD_BOTTOM } from './lib/constants';
 
 interface TimelineGridProps {
   ticks: Tick[];
@@ -66,7 +67,29 @@ export const TimelineGrid = memo(function TimelineGrid({
         ),
       )}
 
-      {/* Lane backgrounds */}
+      {/* Lane backgrounds with top/bottom padding fill */}
+      {lanes.length > 0 && (
+        <>
+          <rect
+            x={0}
+            y={lanes[0].y - LANE_PAD_TOP}
+            width="100%"
+            height={LANE_PAD_TOP}
+            fill="currentColor"
+            fillOpacity={0.02}
+            rx={3}
+          />
+          <rect
+            x={0}
+            y={lanes[lanes.length - 1].y + lanes[lanes.length - 1].height}
+            width="100%"
+            height={LANE_PAD_BOTTOM}
+            fill="currentColor"
+            fillOpacity={0.02}
+            rx={3}
+          />
+        </>
+      )}
       {lanes.map((lane) => (
         <rect
           key={lane.category}

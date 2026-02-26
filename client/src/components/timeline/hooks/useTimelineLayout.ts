@@ -10,6 +10,8 @@ import {
   MAX_GAP_DURATION_MS,
   DEFAULT_LAST_DURATION_MS,
   LANE_GAP,
+  LANE_PAD_TOP,
+  LANE_PAD_BOTTOM,
 } from '../lib/constants';
 import { computeLanes, placeItems, assignSubRows } from '../lib/algorithms';
 import { buildCompressedTimeMap } from '../lib/gap-compression';
@@ -148,7 +150,7 @@ export function useTimelineLayout(
     // Stretch lanes to fill viewport when content is shorter
     const lastLane = rawLanes[rawLanes.length - 1];
     const contentHeight = lastLane
-      ? lastLane.y + lastLane.height + LANE_GAP
+      ? lastLane.y + lastLane.height + LANE_PAD_BOTTOM
       : 100;
 
     let lanes = rawLanes;

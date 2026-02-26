@@ -11,6 +11,7 @@ import {
   MAX_SUB_ROWS,
   CATEGORY_ORDER,
   RULER_SPACING_PX,
+  LANE_PAD_TOP,
 } from './constants';
 
 /**
@@ -90,7 +91,7 @@ export function computeLanes(
   expandLevel?: ExpandLevel,
 ): LaneInfo[] {
   const lanes: LaneInfo[] = [];
-  let y = 0;
+  let y = LANE_PAD_TOP;
 
   const categoryLabels: Record<EventCategory, string> = {
     user: '사용자',
