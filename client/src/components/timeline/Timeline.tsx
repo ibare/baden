@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TimelineProps, PlacedItem } from './lib/types';
 import type { ExpandLevel } from './lib/constants';
-import { LABEL_WIDTH } from './lib/constants';
+import { LABEL_WIDTH, AUTO_FOLLOW_STORAGE_KEY } from './lib/constants';
 import { useTimelineLayout } from './hooks/useTimelineLayout';
 import { useTimelineTicks } from './hooks/useTimelineTicks';
 import { useTimelineZoom } from './hooks/useTimelineZoom';
@@ -31,6 +31,11 @@ export function Timeline({
     onPointerDown, onPointerMove, onPointerUp, isDragging,
   } = useTimelineZoom();
   const [expandLevel, setExpandLevel] = useState<ExpandLevel>(0);
+  const [autoFollow, setAutoFollow] = useState(() => {
+    try {
+      return localStorage.getItem(AUTO_FOLLOW_STORAGE_KEY) === 'true';
+    } catch { return false; }
+  });
   const [viewportWidth, setViewportWidth] = useState(800);
   const [viewportHeight, setViewportHeight] = useState(400);
   const [scrollTop, setScrollTop] = useState(0);
@@ -73,11 +78,35 @@ export function Timeline({
     return () => clearInterval(id);
   }, [isToday]);
 
+  const toggleAutoFollow = useCallback(() => {
+    setAutoFollow(prev => {
+      const next = !prev;
+      try { localStorage.setItem(AUTO_FOLLOW_STORAGE_KEY, String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+
   const { placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth, timeMap } =
     useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth, resolveAction, expandLevel);
 
   const ticks = useTimelineTicks(rangeStart, rangeEnd, ppm, zoomSec, timeMap);
   const connections = useTimelineConnections(placed);
+
+  // Auto-follow: scroll to latest event when new events arrive
+  useEffect(() => {
+    if (!autoFollow || !isToday || placed.length === 0 || isDragging) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let maxRight = 0;
+    for (const item of placed) {
+      const right = item.x + item.width;
+      if (right > maxRight) maxRight = right;
+    }
+
+    const target = maxRight - viewportWidth + 80;
+    container.scrollLeft = Math.max(0, target);
+  }, [placed, autoFollow, isToday, isDragging, viewportWidth, scrollContainerRef]);
 
   const handleSelectItem = useCallback(
     (item: PlacedItem) => {
@@ -117,6 +146,8 @@ export function Timeline({
         onCycleExpand={() => setExpandLevel(v => ((v + 1) % 3) as ExpandLevel)}
         zoomSec={zoomSec}
         onZoomChange={setZoomSec}
+        autoFollow={autoFollow}
+        onToggleAutoFollow={toggleAutoFollow}
       />
 
       {/* Sticky time ruler with NOW label overlay */}

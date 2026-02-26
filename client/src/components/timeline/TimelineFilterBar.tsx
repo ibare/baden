@@ -1,7 +1,7 @@
 import { memo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { CaretLeft, CaretRight, MagnifyingGlass, MagnifyingGlassPlus, MagnifyingGlassMinus, Rows } from '@phosphor-icons/react';
+import { CaretLeft, CaretRight, Crosshair, MagnifyingGlass, MagnifyingGlassPlus, MagnifyingGlassMinus, Rows } from '@phosphor-icons/react';
 import type { ExpandLevel } from './lib/constants';
 import { SLIDER_MIN_SEC, SLIDER_MAX_SEC, SLIDER_STEP_SEC } from './lib/constants';
 
@@ -15,6 +15,8 @@ interface TimelineFilterBarProps {
   onCycleExpand: () => void;
   zoomSec: number;
   onZoomChange: (sec: number) => void;
+  autoFollow: boolean;
+  onToggleAutoFollow: () => void;
 }
 
 function shiftDate(dateStr: string, delta: number): string {
@@ -38,6 +40,8 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
   onCycleExpand,
   zoomSec,
   onZoomChange,
+  autoFollow,
+  onToggleAutoFollow,
 }: TimelineFilterBarProps) {
   const handleSlider = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,6 +107,21 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
         }
       >
         <Rows size={14} weight={expandLevel === 2 ? 'bold' : expandLevel === 1 ? 'regular' : 'thin'} />
+      </button>
+
+      {/* Auto-follow toggle */}
+      <button
+        onClick={onToggleAutoFollow}
+        className={cn(
+          'p-1 rounded transition-colors',
+          !isToday && 'opacity-30 pointer-events-none',
+          autoFollow
+            ? 'text-primary bg-primary/10'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+        )}
+        title={autoFollow ? '자동 추적 끄기' : '자동 추적 켜기'}
+      >
+        <Crosshair size={14} weight={autoFollow ? 'bold' : 'regular'} />
       </button>
 
       <div className="w-px h-5 bg-border" />

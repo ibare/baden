@@ -36,6 +36,9 @@ export const CLUSTER_PADDING_MS = 30_000;           // 클러스터 앞뒤 30초
 export const COMPRESSED_EVENT_GAP_PX = 60;         // 긴 이벤트 압축 gap 폭
 export const EVENT_HEAD_TAIL_RATIO = 0.35;         // 뷰포트의 35%를 head/tail로 유지
 
+// Auto-follow
+export const AUTO_FOLLOW_STORAGE_KEY = 'baden-timeline-auto-follow';
+
 // Category ordering
 export const CATEGORY_ORDER: EventCategory[] = [
   'user',
