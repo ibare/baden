@@ -121,8 +121,8 @@ export function useTimelineLayout(
   // Stage 3: Build compressed time map
   const timeMap = useMemo(() => {
     const filteredItems = items.filter((i) => activeCategories.has(i.category));
-    return buildCompressedTimeMap(filteredItems, rangeStart, rangeEnd, ppm);
-  }, [items, activeCategories, rangeStart, rangeEnd, ppm]);
+    return buildCompressedTimeMap(filteredItems, rangeStart, rangeEnd, ppm, viewportWidth);
+  }, [items, activeCategories, rangeStart, rangeEnd, ppm, viewportWidth]);
 
   // Stage 4: Layout
   const { lanes, placed, totalHeight, totalWidth } = useMemo(() => {

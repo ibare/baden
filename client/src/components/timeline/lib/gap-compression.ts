@@ -1,7 +1,9 @@
-import type { TimelineItem, TimeSegment, CompressedTimeMap } from './types';
+import type { TimelineItem, TimeSegment, CompressedTimeMap, SegmentType } from './types';
 import {
   GAP_THRESHOLD_MS,
   COMPRESSED_GAP_PX,
+  COMPRESSED_EVENT_GAP_PX,
+  EVENT_HEAD_TAIL_RATIO,
   CLUSTER_PADDING_MS,
   MIN_BAR_WIDTH_PX,
 } from './constants';
@@ -9,6 +11,14 @@ import {
 interface Cluster {
   startMs: number;
   endMs: number;
+}
+
+/** A compressed region — either a gap (empty time) or event_gap (long event middle) */
+interface CompressedRegion {
+  startMs: number;
+  endMs: number;
+  type: 'gap' | 'event_gap';
+  pxWidth: number;
 }
 
 /**
@@ -82,27 +92,110 @@ export function detectGaps(
 }
 
 /**
- * Build a CompressedTimeMap that compresses gap regions into fixed-width segments.
- * Active regions use normal ppm scaling, gap regions use COMPRESSED_GAP_PX.
+ * Detect events whose rendered width exceeds the viewport and that don't
+ * overlap with any other events. Returns the middle region to compress.
+ */
+export function detectLongEvents(
+  items: TimelineItem[],
+  ppm: number,
+  viewportWidth: number,
+): { itemId: string; headEndMs: number; tailStartMs: number }[] {
+  if (viewportWidth <= 0 || ppm <= 0) return [];
+
+  const results: { itemId: string; headEndMs: number; tailStartMs: number }[] = [];
+  const headTailMs = (EVENT_HEAD_TAIL_RATIO * viewportWidth / ppm) * 60_000;
+
+  for (const item of items) {
+    const durationMs = item.endMs - item.startMs;
+    const renderedWidth = (durationMs / 60_000) * ppm;
+
+    // Only compress events wider than viewport
+    if (renderedWidth <= viewportWidth) continue;
+
+    // Check if any other event overlaps with this one's time range
+    const hasOverlap = items.some(
+      (other) =>
+        other.id !== item.id &&
+        other.startMs < item.endMs &&
+        other.endMs > item.startMs,
+    );
+    if (hasOverlap) continue;
+
+    const headEndMs = item.startMs + headTailMs;
+    const tailStartMs = item.endMs - headTailMs;
+
+    // Skip if head and tail overlap (event only slightly wider than viewport)
+    if (headEndMs >= tailStartMs) continue;
+
+    results.push({ itemId: item.id, headEndMs, tailStartMs });
+  }
+
+  return results;
+}
+
+/**
+ * Build a CompressedTimeMap that compresses gap regions and long event
+ * middle regions into fixed-width segments.
+ * Active regions use normal ppm scaling, compressed regions use fixed px.
  *
- * If no gaps are detected, returns a linear pass-through map.
+ * If no compressed regions exist, returns a linear pass-through map.
  */
 export function buildCompressedTimeMap(
   items: TimelineItem[],
   rangeStart: number,
   rangeEnd: number,
   ppm: number,
+  viewportWidth: number = 0,
 ): CompressedTimeMap {
   const { gaps } = detectGaps(items, rangeStart, rangeEnd);
+  const longEvents = detectLongEvents(items, ppm, viewportWidth);
 
-  // No gaps → linear pass-through
-  if (gaps.length === 0) {
+  // Build unified compressed regions
+  const regions: CompressedRegion[] = [];
+
+  for (const gap of gaps) {
+    regions.push({
+      startMs: gap.startMs,
+      endMs: gap.endMs,
+      type: 'gap',
+      pxWidth: COMPRESSED_GAP_PX,
+    });
+  }
+
+  for (const le of longEvents) {
+    regions.push({
+      startMs: le.headEndMs,
+      endMs: le.tailStartMs,
+      type: 'event_gap',
+      pxWidth: COMPRESSED_EVENT_GAP_PX,
+    });
+  }
+
+  // Sort by startMs; on overlap, earlier region wins
+  regions.sort((a, b) => a.startMs - b.startMs);
+
+  // Remove overlapping regions (earlier one wins)
+  const filtered: CompressedRegion[] = [];
+  for (const r of regions) {
+    if (filtered.length === 0) {
+      filtered.push(r);
+    } else {
+      const prev = filtered[filtered.length - 1];
+      if (r.startMs >= prev.endMs) {
+        filtered.push(r);
+      }
+      // else: overlap, skip this region
+    }
+  }
+
+  // No compressed regions → linear pass-through
+  if (filtered.length === 0) {
     const totalWidth = Math.max(MIN_BAR_WIDTH_PX, ((rangeEnd - rangeStart) / 60_000) * ppm);
     return {
       segments: [{
         startMs: rangeStart,
         endMs: rangeEnd,
-        isGap: false,
+        type: 'active',
         pxOffset: 0,
         pxWidth: totalWidth,
       }],
@@ -114,37 +207,37 @@ export function buildCompressedTimeMap(
     };
   }
 
-  // Build segments alternating between active and gap
+  // Build segments alternating between active and compressed
   const segments: TimeSegment[] = [];
   let cursor = rangeStart;
   let pxOffset = 0;
 
-  for (const gap of gaps) {
-    // Active segment before gap
-    if (gap.startMs > cursor) {
-      const durationMs = gap.startMs - cursor;
+  for (const region of filtered) {
+    // Active segment before compressed region
+    if (region.startMs > cursor) {
+      const durationMs = region.startMs - cursor;
       const pxWidth = (durationMs / 60_000) * ppm;
       segments.push({
         startMs: cursor,
-        endMs: gap.startMs,
-        isGap: false,
+        endMs: region.startMs,
+        type: 'active',
         pxOffset,
         pxWidth,
       });
       pxOffset += pxWidth;
     }
 
-    // Gap segment
+    // Compressed segment
     segments.push({
-      startMs: gap.startMs,
-      endMs: gap.endMs,
-      isGap: true,
+      startMs: region.startMs,
+      endMs: region.endMs,
+      type: region.type,
       pxOffset,
-      pxWidth: COMPRESSED_GAP_PX,
+      pxWidth: region.pxWidth,
     });
-    pxOffset += COMPRESSED_GAP_PX;
+    pxOffset += region.pxWidth;
 
-    cursor = gap.endMs;
+    cursor = region.endMs;
   }
 
   // Trailing active segment
@@ -154,7 +247,7 @@ export function buildCompressedTimeMap(
     segments.push({
       startMs: cursor,
       endMs: rangeEnd,
-      isGap: false,
+      type: 'active',
       pxOffset,
       pxWidth,
     });
@@ -187,8 +280,8 @@ export function buildCompressedTimeMap(
 
     const seg = findSegment(ms);
 
-    if (seg.isGap) {
-      // Interpolate within gap (compressed)
+    if (seg.type !== 'active') {
+      // Interpolate within compressed region
       const frac = (ms - seg.startMs) / (seg.endMs - seg.startMs);
       return seg.pxOffset + frac * seg.pxWidth;
     }
@@ -213,7 +306,7 @@ export function buildCompressedTimeMap(
 
     const offsetPx = x - seg.pxOffset;
 
-    if (seg.isGap) {
+    if (seg.type !== 'active') {
       const frac = offsetPx / seg.pxWidth;
       return seg.startMs + frac * (seg.endMs - seg.startMs);
     }
@@ -231,7 +324,7 @@ export function buildCompressedTimeMap(
 
 /**
  * Format a gap duration as a human-readable string.
- * e.g., "⋯ 2h 15m", "⋯ 45m", "⋯ 3m"
+ * e.g., "2h 15m", "45m", "3m"
  */
 export function formatGapDuration(durationMs: number): string {
   const totalMin = Math.round(durationMs / 60_000);
@@ -241,4 +334,12 @@ export function formatGapDuration(durationMs: number): string {
   if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
   if (hours > 0) return `${hours}h`;
   return `${minutes}m`;
+}
+
+/**
+ * Format an event gap duration with a "~" prefix.
+ * e.g., "~2h 15m", "~45m", "~3m"
+ */
+export function formatEventGapDuration(durationMs: number): string {
+  return `~${formatGapDuration(durationMs)}`;
 }

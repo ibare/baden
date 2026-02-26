@@ -15,7 +15,8 @@ export const TimelineRuler = memo(function TimelineRuler({
   totalWidth,
   scrollLeft,
 }: TimelineRulerProps) {
-  const gapSegments = segments.filter((s) => s.isGap);
+  const gapSegments = segments.filter((s) => s.type === 'gap');
+  const eventGapSegments = segments.filter((s) => s.type === 'event_gap');
 
   return (
     <div className="flex flex-shrink-0 border-b border-border" style={{ height: TIME_AXIS_HEIGHT }}>
@@ -41,9 +42,21 @@ export const TimelineRuler = memo(function TimelineRuler({
             />
           ))}
 
+          {/* Event gap background rects */}
+          {eventGapSegments.map((seg) => (
+            <rect
+              key={`egap-bg-${seg.startMs}`}
+              x={seg.pxOffset}
+              y={0}
+              width={seg.pxWidth}
+              height={TIME_AXIS_HEIGHT}
+              fill="#555"
+            />
+          ))}
+
           {/* Ticks */}
           {ticks.map((tick) =>
-            tick.isGap ? (
+            tick.segmentType === 'gap' ? (
               <g key={`gap-${tick.ms}`}>
                 <text
                   x={tick.x}
@@ -54,6 +67,23 @@ export const TimelineRuler = memo(function TimelineRuler({
                   fontSize={9}
                   fontFamily="monospace"
                   fontWeight={600}
+                  letterSpacing={0.5}
+                >
+                  {tick.label}
+                </text>
+              </g>
+            ) : tick.segmentType === 'event_gap' ? (
+              <g key={`egap-${tick.ms}`}>
+                <text
+                  x={tick.x}
+                  y={TIME_AXIS_HEIGHT / 2 + 1}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fill="#ccc"
+                  fontSize={8}
+                  fontFamily="monospace"
+                  fontWeight={400}
+                  fontStyle="italic"
                   letterSpacing={0.5}
                 >
                   {tick.label}

@@ -45,6 +45,9 @@ export interface Connection {
   type: 'rule_chain' | 'file_link' | 'task_chain';
 }
 
+/** Segment type: active, gap (empty time), or event_gap (long event compressed) */
+export type SegmentType = 'active' | 'gap' | 'event_gap';
+
 /** Tick mark on the time axis */
 export interface Tick {
   ms: number;
@@ -52,15 +55,15 @@ export interface Tick {
   x: number;
   /** Major ticks get labels, minor ticks only get grid lines */
   isMajor: boolean;
-  /** True for gap separator ticks */
-  isGap?: boolean;
+  /** Set for compressed segment ticks (gap or event_gap) */
+  segmentType?: 'gap' | 'event_gap';
 }
 
 /** A contiguous time segment (active or compressed gap) */
 export interface TimeSegment {
   startMs: number;
   endMs: number;
-  isGap: boolean;
+  type: SegmentType;
   /** Pixel offset where this segment begins */
   pxOffset: number;
   /** Pixel width of this segment */

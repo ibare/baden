@@ -32,6 +32,10 @@ export const GAP_THRESHOLD_MS = 3 * 60_000;       // 3분 이상 빈 구간 → 
 export const COMPRESSED_GAP_PX = 40;               // 압축 gap 폭
 export const CLUSTER_PADDING_MS = 30_000;           // 클러스터 앞뒤 30초 여유
 
+// Long event compression
+export const COMPRESSED_EVENT_GAP_PX = 60;         // 긴 이벤트 압축 gap 폭
+export const EVENT_HEAD_TAIL_RATIO = 0.35;         // 뷰포트의 35%를 head/tail로 유지
+
 // Category ordering
 export const CATEGORY_ORDER: EventCategory[] = [
   'user',

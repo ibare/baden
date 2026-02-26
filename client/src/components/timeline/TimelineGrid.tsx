@@ -14,12 +14,14 @@ export const TimelineGrid = memo(function TimelineGrid({
   totalHeight,
   segments,
 }: TimelineGridProps) {
-  const gapSegments = segments.filter((s) => s.isGap);
+  const gapSegments = segments.filter((s) => s.type === 'gap');
+  const eventGapSegments = segments.filter((s) => s.type === 'event_gap');
 
   return (
     <g className="timeline-grid">
-      {/* Hatching pattern definition */}
+      {/* Pattern definitions */}
       <defs>
+        {/* Gap hatching pattern (45° lines) */}
         <pattern
           id="gap-hatch"
           width={6}
@@ -37,11 +39,20 @@ export const TimelineGrid = memo(function TimelineGrid({
             strokeWidth={7}
           />
         </pattern>
+        {/* Event gap dot pattern */}
+        <pattern
+          id="event-gap-dots"
+          width={8}
+          height={8}
+          patternUnits="userSpaceOnUse"
+        >
+          <circle cx={4} cy={4} r={1} fill="currentColor" fillOpacity={0.12} />
+        </pattern>
       </defs>
 
-      {/* Grid lines — skip gap ticks */}
+      {/* Grid lines — skip compressed segment ticks */}
       {ticks.map((tick) =>
-        tick.isGap ? null : (
+        tick.segmentType ? null : (
           <line
             key={tick.ms}
             x1={tick.x}
@@ -88,6 +99,29 @@ export const TimelineGrid = memo(function TimelineGrid({
             width={seg.pxWidth}
             height={totalHeight}
             fill="url(#gap-hatch)"
+          />
+        </g>
+      ))}
+
+      {/* Event gap overlays: lighter tint + dot pattern */}
+      {eventGapSegments.map((seg) => (
+        <g key={`event-gap-${seg.startMs}`}>
+          {/* Semi-transparent background */}
+          <rect
+            x={seg.pxOffset}
+            y={0}
+            width={seg.pxWidth}
+            height={totalHeight}
+            fill="currentColor"
+            fillOpacity={0.03}
+          />
+          {/* Dot pattern */}
+          <rect
+            x={seg.pxOffset}
+            y={0}
+            width={seg.pxWidth}
+            height={totalHeight}
+            fill="url(#event-gap-dots)"
           />
         </g>
       ))}

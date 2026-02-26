@@ -80,7 +80,8 @@ export const TimelineMinimap = memo(function TimelineMinimap({
 
   if (placed.length === 0) return null;
 
-  const gapSegments = segments.filter((s) => s.isGap);
+  const gapSegments = segments.filter((s) => s.type === 'gap');
+  const eventGapSegments = segments.filter((s) => s.type === 'event_gap');
 
   return (
     <div
@@ -105,6 +106,7 @@ export const TimelineMinimap = memo(function TimelineMinimap({
         onPointerLeave={handlePointerUp}
       >
         <defs>
+          {/* Gap hatching pattern */}
           <pattern
             id="minimap-gap-hatch"
             width={4}
@@ -119,6 +121,15 @@ export const TimelineMinimap = memo(function TimelineMinimap({
               strokeWidth={1}
             />
           </pattern>
+          {/* Event gap dot pattern */}
+          <pattern
+            id="minimap-event-gap-dots"
+            width={4}
+            height={4}
+            patternUnits="userSpaceOnUse"
+          >
+            <circle cx={2} cy={2} r={0.5} fill="currentColor" fillOpacity={0.1} />
+          </pattern>
         </defs>
 
         {/* Gap regions */}
@@ -130,6 +141,18 @@ export const TimelineMinimap = memo(function TimelineMinimap({
             width={seg.pxWidth * scaleX}
             height={MINIMAP_HEIGHT}
             fill="url(#minimap-gap-hatch)"
+          />
+        ))}
+
+        {/* Event gap regions */}
+        {eventGapSegments.map((seg) => (
+          <rect
+            key={`egap-${seg.startMs}`}
+            x={seg.pxOffset * scaleX}
+            y={0}
+            width={seg.pxWidth * scaleX}
+            height={MINIMAP_HEIGHT}
+            fill="url(#minimap-event-gap-dots)"
           />
         ))}
 
