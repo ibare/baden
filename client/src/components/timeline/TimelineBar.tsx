@@ -1,12 +1,14 @@
 import { memo, useState, useCallback } from 'react';
 import type { PlacedItem } from './lib/types';
-import { BAR_HEIGHT, ICON_MIN_WIDTH_PX, TEXT_MIN_WIDTH_PX } from './lib/constants';
+import type { ExpandLevel } from './lib/constants';
+import { BAR_HEIGHT, DETAIL_HEIGHTS, ICON_MIN_WIDTH_PX, TEXT_MIN_WIDTH_PX } from './lib/constants';
 import { CATEGORY_COLORS } from './lib/colors';
 import { EVENT_TYPE_ICONS, USER_ICON } from './lib/event-icons';
 import { PHOSPHOR_ICON_MAP } from './lib/icon-map';
 
 interface TimelineBarProps {
   item: PlacedItem;
+  expandLevel: ExpandLevel;
   onClick: (item: PlacedItem) => void;
   onHover: (item: PlacedItem | null) => void;
 }
@@ -15,6 +17,7 @@ const ICON_SIZE = 14;
 
 export const TimelineBar = memo(function TimelineBar({
   item,
+  expandLevel,
   onClick,
   onHover,
 }: TimelineBarProps) {
@@ -64,6 +67,28 @@ export const TimelineBar = memo(function TimelineBar({
   // Text offset (after icon)
   const textX = showIcon ? item.x + 4 + ICON_SIZE + 3 : item.x + 4;
 
+  const detailH = DETAIL_HEIGHTS[expandLevel];
+
+  // Detail info text (for expanded mode)
+  const infoText = (() => {
+    if (expandLevel === 0) return '';
+
+    const isJson = (s: string | null | undefined) => s != null && s.trimStart().startsWith('{');
+    const file = item.event.file?.split('/').pop() ?? null;
+    const summary = item.event.summary && !isJson(item.event.summary) ? item.event.summary : null;
+    const rawAction = item.event.action;
+    const message = (item.event.message && item.event.message !== rawAction && !isJson(item.event.message))
+      ? item.event.message : null;
+    const detail = (item.event.detail && !isJson(item.event.detail)) ? item.event.detail : null;
+
+    // Pick the best context text: summary > message > detail
+    const context = summary ?? message ?? detail ?? null;
+
+    return [file, context].filter(Boolean).join(' · ');
+  })();
+
+  const clipHeight = BAR_HEIGHT + detailH;
+
   return (
     <g
       data-timeline-item
@@ -74,7 +99,7 @@ export const TimelineBar = memo(function TimelineBar({
     >
       {needClip && (
         <clipPath id={clipId}>
-          <rect x={item.x} y={item.y} width={item.width} height={BAR_HEIGHT} rx={3} />
+          <rect x={item.x} y={item.y} width={item.width} height={clipHeight} rx={3} />
         </clipPath>
       )}
       {truncated && (() => {
@@ -190,6 +215,50 @@ export const TimelineBar = memo(function TimelineBar({
           )}
           {showDetail && !detailText && !showLabel && label}
         </text>
+      )}
+      {/* Expanded: detail area */}
+      {expandLevel > 0 && (
+        <>
+          <rect
+            x={item.x}
+            y={item.y + BAR_HEIGHT}
+            width={item.width}
+            height={detailH}
+            fill={colors.detailBg}
+            clipPath={`url(#${clipId})`}
+          />
+          {infoText && (
+            <foreignObject
+              x={item.x}
+              y={item.y + BAR_HEIGHT}
+              width={item.width}
+              height={detailH}
+              clipPath={`url(#${clipId})`}
+              style={{ pointerEvents: 'none' }}
+            >
+              <div
+                style={{
+                  width: item.width,
+                  height: detailH,
+                  padding: '2px 4px',
+                  fontSize: 9,
+                  lineHeight: '1.3',
+                  color: colors.detailText,
+                  userSelect: 'none',
+                  overflow: 'hidden',
+                  display: '-webkit-box',
+                  WebkitLineClamp: expandLevel === 2 ? 2 : 1,
+                  WebkitBoxOrient: 'vertical',
+                  textOverflow: 'ellipsis',
+                  overflowWrap: 'break-word',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {infoText}
+              </div>
+            </foreignObject>
+          )}
+        </>
       )}
     </g>
   );

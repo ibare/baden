@@ -5,6 +5,8 @@ export const LABEL_WIDTH = 72;
 export const TIME_AXIS_HEIGHT = 28;
 export const SUB_ROW_HEIGHT = 28;
 export const BAR_HEIGHT = 22;
+export type ExpandLevel = 0 | 1 | 2;
+export const DETAIL_HEIGHTS = [0, 22, 44] as const;
 export const LANE_GAP = 6;
 export const MARKER_SIZE = 10;
 export const MIN_BAR_WIDTH_PX = 4;
@@ -16,10 +18,10 @@ export const MAX_SUB_ROWS = 8;
 // Zoom — ruler-based: 1 ruler tick = zoomSeconds, pixel gap fixed
 export const RULER_SPACING_PX = 80;
 /** Slider min/max/step/default in seconds */
-export const SLIDER_MIN_SEC = 10;
-export const SLIDER_MAX_SEC = 120; // 2분
-export const SLIDER_STEP_SEC = 10;
-export const DEFAULT_ZOOM_SEC = 60; // 1분
+export const SLIDER_MIN_SEC = 1;
+export const SLIDER_MAX_SEC = 60;
+export const SLIDER_STEP_SEC = 1;
+export const DEFAULT_ZOOM_SEC = 2;
 
 // Duration inference
 export const MAX_GAP_DURATION_MS = 5 * 60_000;

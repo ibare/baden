@@ -4,6 +4,7 @@ import type { EventCategory } from '@/lib/event-types';
 import { EVENT_CATEGORY_MAP } from '@/lib/event-types';
 import type { ResolvedAction } from '@/hooks/useActionRegistry';
 import type { TimelineItem, PlacedItem, LaneInfo, CompressedTimeMap } from '../lib/types';
+import type { ExpandLevel } from '../lib/constants';
 import {
   INSTANT_THRESHOLD_MS,
   MAX_GAP_DURATION_MS,
@@ -32,6 +33,7 @@ export function useTimelineLayout(
   ppm: number,
   viewportWidth: number,
   resolveAction?: (action: string | null, type: string) => ResolvedAction,
+  expandLevel?: ExpandLevel,
 ): LayoutResult {
   // Stage 1: Convert RuleEvents → TimelineItems
   const items = useMemo((): TimelineItem[] => {
@@ -140,9 +142,9 @@ export function useTimelineLayout(
       eventCounts.set(cat, catItems.length);
     }
 
-    const lanes = computeLanes(activeCategories, subRowCounts, eventCounts);
+    const lanes = computeLanes(activeCategories, subRowCounts, eventCounts, expandLevel);
     const filteredItems = items.filter((i) => activeCategories.has(i.category));
-    const placed = placeItems(filteredItems, lanes, rangeStart, ppm, timeMap);
+    const placed = placeItems(filteredItems, lanes, rangeStart, ppm, timeMap, expandLevel);
 
     const lastLane = lanes[lanes.length - 1];
     const totalHeight = lastLane
@@ -152,7 +154,7 @@ export function useTimelineLayout(
     const totalWidth = Math.max(timeMap.totalWidth, viewportWidth);
 
     return { lanes, placed, totalHeight, totalWidth };
-  }, [items, activeCategories, ppm, rangeStart, rangeEnd, viewportWidth, timeMap]);
+  }, [items, activeCategories, ppm, rangeStart, rangeEnd, viewportWidth, timeMap, expandLevel]);
 
   return { items, placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth, timeMap };
 }

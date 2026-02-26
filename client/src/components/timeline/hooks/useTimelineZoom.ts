@@ -29,8 +29,21 @@ function snap(s: number): number {
   return Math.round(s / SLIDER_STEP_SEC) * SLIDER_STEP_SEC;
 }
 
+const ZOOM_STORAGE_KEY = 'baden-timeline-zoom-sec';
+
+function loadZoom(): number {
+  try {
+    const v = localStorage.getItem(ZOOM_STORAGE_KEY);
+    if (v != null) {
+      const n = parseFloat(v);
+      if (!Number.isNaN(n)) return clamp(snap(n));
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_ZOOM_SEC;
+}
+
 export function useTimelineZoom(): ZoomState {
-  const [zoomSec, setRaw] = useState(DEFAULT_ZOOM_SEC);
+  const [zoomSec, setRaw] = useState(loadZoom);
   const [isDragging, setIsDragging] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef({ startX: 0, startY: 0, scrollLeft: 0, scrollTop: 0 });
@@ -42,7 +55,9 @@ export function useTimelineZoom(): ZoomState {
   const ppm = RULER_SPACING_PX / (zoomSec / 60);
 
   const setZoomSec = useCallback((s: number) => {
-    setRaw(clamp(snap(s)));
+    const v = clamp(snap(s));
+    setRaw(v);
+    try { localStorage.setItem(ZOOM_STORAGE_KEY, String(v)); } catch { /* ignore */ }
   }, []);
 
   const handleWheel = useCallback(

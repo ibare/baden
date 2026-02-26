@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TimelineProps, PlacedItem } from './lib/types';
+import type { ExpandLevel } from './lib/constants';
 import { LABEL_WIDTH } from './lib/constants';
 import { useTimelineLayout } from './hooks/useTimelineLayout';
 import { useTimelineTicks } from './hooks/useTimelineTicks';
@@ -28,6 +29,7 @@ export function Timeline({
     zoomSec, setZoomSec, ppm, handleWheel, scrollContainerRef,
     onPointerDown, onPointerMove, onPointerUp, isDragging,
   } = useTimelineZoom();
+  const [expandLevel, setExpandLevel] = useState<ExpandLevel>(0);
   const [viewportWidth, setViewportWidth] = useState(800);
   const [viewportHeight, setViewportHeight] = useState(400);
   const [scrollTop, setScrollTop] = useState(0);
@@ -71,7 +73,7 @@ export function Timeline({
   }, [isToday]);
 
   const { placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth, timeMap } =
-    useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth, resolveAction);
+    useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth, resolveAction, expandLevel);
 
   const ticks = useTimelineTicks(rangeStart, rangeEnd, ppm, zoomSec, timeMap);
   const connections = useTimelineConnections(placed);
@@ -110,6 +112,8 @@ export function Timeline({
         isToday={isToday}
         search={search}
         onSearchChange={onSearchChange}
+        expandLevel={expandLevel}
+        onCycleExpand={() => setExpandLevel(v => ((v + 1) % 3) as ExpandLevel)}
         zoomSec={zoomSec}
         onZoomChange={setZoomSec}
       />
@@ -149,6 +153,7 @@ export function Timeline({
                 rangeStart={rangeStart}
                 ppm={ppm}
                 isToday={isToday}
+                expandLevel={expandLevel}
                 timeMap={timeMap}
                 onSelectItem={handleSelectItem}
                 onWheel={handleWheel}

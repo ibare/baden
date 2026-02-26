@@ -7,6 +7,8 @@ export interface CategoryColors {
   text: string;
   bg: string;
   connector: string;
+  detailBg: string;
+  detailText: string;
 }
 
 export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
@@ -17,6 +19,8 @@ export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
     text: '#1d4ed8',
     bg: 'rgba(96,165,250,0.08)',
     connector: '#60a5fa',
+    detailBg: '#2563eb',
+    detailText: '#dbeafe',
   },
   exploration: {
     fill: '#2dd4bf',
@@ -25,6 +29,8 @@ export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
     text: '#0f766e',
     bg: 'rgba(45,212,191,0.08)',
     connector: '#2dd4bf',
+    detailBg: '#0d9488',
+    detailText: '#ccfbf1',
   },
   planning: {
     fill: '#c084fc',
@@ -33,6 +39,8 @@ export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
     text: '#7e22ce',
     bg: 'rgba(192,132,252,0.08)',
     connector: '#c084fc',
+    detailBg: '#7e22ce',
+    detailText: '#f3e8ff',
   },
   implementation: {
     fill: '#fb923c',
@@ -41,6 +49,8 @@ export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
     text: '#c2410c',
     bg: 'rgba(251,146,60,0.08)',
     connector: '#fb923c',
+    detailBg: '#c2410c',
+    detailText: '#fff7ed',
   },
   verification: {
     fill: '#facc15',
@@ -49,6 +59,8 @@ export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
     text: '#a16207',
     bg: 'rgba(250,204,21,0.08)',
     connector: '#facc15',
+    detailBg: '#a16207',
+    detailText: '#fefce8',
   },
   debugging: {
     fill: '#fbbf24',
@@ -57,6 +69,8 @@ export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
     text: '#b45309',
     bg: 'rgba(251,191,36,0.08)',
     connector: '#fbbf24',
+    detailBg: '#92400e',
+    detailText: '#fffbeb',
   },
   rule_compliance: {
     fill: '#fb7185',
@@ -65,6 +79,8 @@ export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
     text: '#be123c',
     bg: 'rgba(251,113,133,0.08)',
     connector: '#fb7185',
+    detailBg: '#be123c',
+    detailText: '#fff1f2',
   },
 };
 

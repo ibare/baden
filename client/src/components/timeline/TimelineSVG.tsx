@@ -1,4 +1,5 @@
 import { memo, useCallback, useState, type WheelEvent, type PointerEvent } from 'react';
+import type { ExpandLevel } from './lib/constants';
 import type { PlacedItem, LaneInfo, Tick, Connection, CompressedTimeMap } from './lib/types';
 import { TimelineGrid } from './TimelineGrid';
 import { TimelineBar } from './TimelineBar';
@@ -18,6 +19,7 @@ interface TimelineSVGProps {
   rangeStart: number;
   ppm: number;
   isToday: boolean;
+  expandLevel: ExpandLevel;
   timeMap: CompressedTimeMap;
   onSelectItem: (item: PlacedItem) => void;
   onWheel: (e: WheelEvent<HTMLDivElement>) => void;
@@ -38,6 +40,7 @@ export const TimelineSVG = memo(function TimelineSVG({
   viewportWidth,
   rangeStart,
   isToday,
+  expandLevel,
   timeMap,
   onSelectItem,
   onWheel,
@@ -100,6 +103,7 @@ export const TimelineSVG = memo(function TimelineSVG({
               <TimelineBar
                 key={item.id}
                 item={item}
+                expandLevel={expandLevel}
                 onClick={handleClick}
                 onHover={handleHover}
               />
@@ -113,7 +117,9 @@ export const TimelineSVG = memo(function TimelineSVG({
           isToday={isToday}
         />
       </svg>
-      <TimelineTooltip item={hoveredItem} scrollContainerRef={scrollContainerRef} />
+      {expandLevel === 0 && (
+        <TimelineTooltip item={hoveredItem} scrollContainerRef={scrollContainerRef} />
+      )}
     </div>
   );
 });

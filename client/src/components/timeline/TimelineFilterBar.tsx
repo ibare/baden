@@ -1,7 +1,8 @@
 import { memo, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { CaretLeft, CaretRight, MagnifyingGlass, MagnifyingGlassPlus, MagnifyingGlassMinus } from '@phosphor-icons/react';
+import { CaretLeft, CaretRight, MagnifyingGlass, MagnifyingGlassPlus, MagnifyingGlassMinus, Rows } from '@phosphor-icons/react';
+import type { ExpandLevel } from './lib/constants';
 import { SLIDER_MIN_SEC, SLIDER_MAX_SEC, SLIDER_STEP_SEC } from './lib/constants';
 
 interface TimelineFilterBarProps {
@@ -10,6 +11,8 @@ interface TimelineFilterBarProps {
   isToday: boolean;
   search: string;
   onSearchChange: (s: string) => void;
+  expandLevel: ExpandLevel;
+  onCycleExpand: () => void;
   zoomSec: number;
   onZoomChange: (sec: number) => void;
 }
@@ -31,6 +34,8 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
   isToday,
   search,
   onSearchChange,
+  expandLevel,
+  onCycleExpand,
   zoomSec,
   onZoomChange,
 }: TimelineFilterBarProps) {
@@ -83,6 +88,24 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Expand toggle (3-level cycle) */}
+      <button
+        onClick={onCycleExpand}
+        className={cn(
+          'p-1 rounded transition-colors',
+          expandLevel > 0
+            ? 'text-primary bg-primary/10'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+        )}
+        title={
+          expandLevel === 0 ? '하단 표시' : expandLevel === 1 ? '하단 넓히기' : '하단 없음'
+        }
+      >
+        <Rows size={14} weight={expandLevel === 2 ? 'bold' : expandLevel === 1 ? 'regular' : 'thin'} />
+      </button>
+
+      <div className="w-px h-5 bg-border" />
 
       {/* Zoom controls */}
       <div className="flex items-center gap-2">

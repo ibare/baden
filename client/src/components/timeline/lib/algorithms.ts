@@ -1,8 +1,10 @@
 import type { TimelineItem, PlacedItem, Connection, LaneInfo, CompressedTimeMap } from './types';
 import type { EventCategory } from '@/lib/event-types';
+import type { ExpandLevel } from './constants';
 import {
   SUB_ROW_HEIGHT,
   BAR_HEIGHT,
+  DETAIL_HEIGHTS,
   LANE_GAP,
   MARKER_SIZE,
   MIN_BAR_WIDTH_PX,
@@ -85,6 +87,7 @@ export function computeLanes(
   activeCategories: Set<EventCategory>,
   subRowCounts: Map<EventCategory, number>,
   eventCounts?: Map<EventCategory, number>,
+  expandLevel?: ExpandLevel,
 ): LaneInfo[] {
   const lanes: LaneInfo[] = [];
   let y = 0;
@@ -98,6 +101,9 @@ export function computeLanes(
     debugging: '디버깅',
     rule_compliance: '규칙',
   };
+
+  const detailH = DETAIL_HEIGHTS[expandLevel ?? 0];
+  const rowUnit = SUB_ROW_HEIGHT + detailH;
 
   // Find max event count for proportional scaling
   let maxEvents = 1;
@@ -114,16 +120,17 @@ export function computeLanes(
     const evtCount = eventCounts?.get(cat) || 0;
 
     // Base height from sub-rows
-    const subRowHeight = subRows * SUB_ROW_HEIGHT;
+    const subRowHeight = subRows * rowUnit;
 
     // Density bonus: 0–2 extra sub-row heights proportional to event density
     let densityBonus = 0;
     if (eventCounts && maxEvents > 1 && evtCount > 2) {
       const density = evtCount / maxEvents; // 0..1
-      densityBonus = Math.round(density * 2) * SUB_ROW_HEIGHT;
+      densityBonus = Math.round(density * 2) * rowUnit;
     }
 
-    const height = Math.max(MIN_LANE_HEIGHT, subRowHeight + densityBonus);
+    const minLaneHeight = (expandLevel ?? 0) > 0 ? rowUnit : MIN_LANE_HEIGHT;
+    const height = Math.max(minLaneHeight, subRowHeight + densityBonus);
     lanes.push({ category: cat, label: categoryLabels[cat], subRowCount: subRows, y, height });
     y += height + LANE_GAP;
   }
@@ -140,6 +147,7 @@ export function placeItems(
   rangeStart: number,
   ppm: number,
   timeMap?: CompressedTimeMap,
+  expandLevel?: ExpandLevel,
 ): PlacedItem[] {
   const laneMap = new Map<EventCategory, number>();
   lanes.forEach((l, i) => laneMap.set(l.category, i));
@@ -171,7 +179,10 @@ export function placeItems(
         : timeMap
           ? timeMap.durationToWidth(item.startMs, item.endMs - item.startMs)
           : durationToWidth(item.endMs - item.startMs, ppm);
-      const y = lane.y + subRow * SUB_ROW_HEIGHT + (SUB_ROW_HEIGHT - BAR_HEIGHT) / 2;
+      const detailH = DETAIL_HEIGHTS[expandLevel ?? 0];
+      const rowUnit = SUB_ROW_HEIGHT + detailH;
+      const itemHeight = BAR_HEIGHT + detailH;
+      const y = lane.y + subRow * rowUnit + (rowUnit - itemHeight) / 2;
 
       placed.push({ ...item, lane: laneIdx, subRow, x, width, y });
     }
