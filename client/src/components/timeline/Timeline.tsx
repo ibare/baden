@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { RuleEvent } from '@/lib/api';
 import type { TimelineProps, PlacedItem } from './lib/types';
 import type { ExpandLevel } from './lib/constants';
-import { LABEL_WIDTH, AUTO_FOLLOW_STORAGE_KEY } from './lib/constants';
+import { LABEL_WIDTH, AUTO_FOLLOW_STORAGE_KEY, SUB_ROW_HEIGHT } from './lib/constants';
 import { useTimelineLayout } from './hooks/useTimelineLayout';
 import { useTimelineTicks } from './hooks/useTimelineTicks';
 import { useTimelineZoom } from './hooks/useTimelineZoom';
@@ -11,10 +12,12 @@ import { TimelineRuler } from './TimelineRuler';
 import { TimelineLaneLabels } from './TimelineLaneLabels';
 import { TimelineSVG } from './TimelineSVG';
 import { TimelineMinimap } from './TimelineMinimap';
+import { RuleVerificationPanel } from './RuleVerificationPanel';
 
 export function Timeline({
   events,
   allEvents,
+  rawEvents,
   selectedDate,
   onDateChange,
   eventDates,
@@ -41,6 +44,7 @@ export function Timeline({
   const [scrollTop, setScrollTop] = useState(0);
   const [scrollLeft, setScrollLeft] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const [showPanel, setShowPanel] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
 
@@ -78,6 +82,10 @@ export function Timeline({
     return () => clearInterval(id);
   }, [isToday]);
 
+  const togglePanel = useCallback(() => {
+    setShowPanel((prev) => !prev);
+  }, []);
+
   const toggleAutoFollow = useCallback(() => {
     setAutoFollow(prev => {
       const next = !prev;
@@ -87,7 +95,7 @@ export function Timeline({
   }, []);
 
   const { placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth, timeMap } =
-    useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth, resolveAction, expandLevel);
+    useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth, viewportHeight, resolveAction, expandLevel);
 
   const ticks = useTimelineTicks(rangeStart, rangeEnd, ppm, zoomSec, timeMap);
   const connections = useTimelineConnections(placed);
@@ -107,6 +115,39 @@ export function Timeline({
     const target = maxRight - viewportWidth + 80;
     container.scrollLeft = Math.max(0, target);
   }, [placed, autoFollow, isToday, isDragging, viewportWidth, scrollContainerRef]);
+
+  const scrollToPlacedItem = useCallback(
+    (eventId: string) => {
+      const container = scrollContainerRef.current;
+      if (!container || placed.length === 0) return;
+
+      const item = placed.find((i) => i.id === eventId);
+      if (!item) return;
+
+      // Center horizontally on the item
+      const targetScrollLeft = item.x + item.width / 2 - viewportWidth / 2;
+      container.scrollLeft = Math.max(0, targetScrollLeft);
+
+      // Vertically: ensure the item is visible
+      const itemTop = item.y;
+      const itemBottom = item.y + SUB_ROW_HEIGHT;
+      if (itemTop < container.scrollTop || itemBottom > container.scrollTop + viewportHeight) {
+        container.scrollTop = Math.max(0, itemTop - viewportHeight / 2 + SUB_ROW_HEIGHT / 2);
+      }
+    },
+    [placed, viewportWidth, viewportHeight, scrollContainerRef],
+  );
+
+  const handlePanelSelectEvent = useCallback(
+    (event: RuleEvent) => {
+      onSelectEvent(event);
+      // Use rAF to scroll after React has committed the render
+      requestAnimationFrame(() => {
+        scrollToPlacedItem(event.id);
+      });
+    },
+    [onSelectEvent, scrollToPlacedItem],
+  );
 
   const handleSelectItem = useCallback(
     (item: PlacedItem) => {
@@ -142,6 +183,9 @@ export function Timeline({
         isToday={isToday}
         search={search}
         onSearchChange={onSearchChange}
+        events={rawEvents}
+        panelOpen={showPanel}
+        onTogglePanel={togglePanel}
         expandLevel={expandLevel}
         onCycleExpand={() => setExpandLevel(v => ((v + 1) % 3) as ExpandLevel)}
         zoomSec={zoomSec}
@@ -211,6 +255,15 @@ export function Timeline({
           </>
         )}
       </div>
+
+      {showPanel && (
+        <RuleVerificationPanel
+          events={rawEvents}
+          selectedEventId={selectedEventId}
+          onClose={() => setShowPanel(false)}
+          onSelectEvent={handlePanelSelectEvent}
+        />
+      )}
     </div>
   );
 }

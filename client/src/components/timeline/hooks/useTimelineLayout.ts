@@ -32,6 +32,7 @@ export function useTimelineLayout(
   activeCategories: Set<EventCategory>,
   ppm: number,
   viewportWidth: number,
+  viewportHeight: number,
   resolveAction?: (action: string | null, type: string) => ResolvedAction,
   expandLevel?: ExpandLevel,
 ): LayoutResult {
@@ -142,19 +143,37 @@ export function useTimelineLayout(
       eventCounts.set(cat, catItems.length);
     }
 
-    const lanes = computeLanes(activeCategories, subRowCounts, eventCounts, expandLevel);
-    const filteredItems = items.filter((i) => activeCategories.has(i.category));
-    const placed = placeItems(filteredItems, lanes, rangeStart, ppm, timeMap, expandLevel);
+    const rawLanes = computeLanes(activeCategories, subRowCounts, eventCounts, expandLevel);
 
-    const lastLane = lanes[lanes.length - 1];
-    const totalHeight = lastLane
+    // Stretch lanes to fill viewport when content is shorter
+    const lastLane = rawLanes[rawLanes.length - 1];
+    const contentHeight = lastLane
       ? lastLane.y + lastLane.height + LANE_GAP
       : 100;
 
+    let lanes = rawLanes;
+    if (rawLanes.length > 0 && contentHeight < viewportHeight) {
+      const extra = viewportHeight - contentHeight;
+      const perLane = Math.floor(extra / rawLanes.length);
+      const remainder = extra - perLane * rawLanes.length;
+
+      let currentY = rawLanes[0].y;
+      lanes = rawLanes.map((lane, i) => {
+        const bonus = i === rawLanes.length - 1 ? perLane + remainder : perLane;
+        const stretched = { ...lane, y: currentY, height: lane.height + bonus };
+        currentY += stretched.height + LANE_GAP;
+        return stretched;
+      });
+    }
+
+    const filteredItems = items.filter((i) => activeCategories.has(i.category));
+    const placed = placeItems(filteredItems, lanes, rangeStart, ppm, timeMap, expandLevel);
+
+    const totalHeight = Math.max(contentHeight, viewportHeight);
     const totalWidth = Math.max(timeMap.totalWidth, viewportWidth);
 
     return { lanes, placed, totalHeight, totalWidth };
-  }, [items, activeCategories, ppm, rangeStart, rangeEnd, viewportWidth, timeMap, expandLevel]);
+  }, [items, activeCategories, ppm, rangeStart, rangeEnd, viewportWidth, viewportHeight, timeMap, expandLevel]);
 
   return { items, placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth, timeMap };
 }
