@@ -291,7 +291,19 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
           </Row>
         )}
         {event.rule_id && (
-          <Row label="Rule"><span className="font-mono text-xs">{event.rule_id}</span></Row>
+          <Row label="Rule">
+            {rule ? (
+              <button
+                type="button"
+                onClick={handleFileClick}
+                className="font-mono text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2 cursor-pointer hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+              >
+                {event.rule_id}
+              </button>
+            ) : (
+              <span className="font-mono text-xs">{event.rule_id}</span>
+            )}
+          </Row>
         )}
         {event.severity && <Row label="Severity">{event.severity}</Row>}
         {event.task_id && (
@@ -342,6 +354,16 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
             )}
           </dl>
         </>
+      )}
+
+      {rule && (
+        <RuleContentDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          title={ruleTitle}
+          body={ruleBody}
+          loading={contentLoading}
+        />
       )}
     </div>
   );
