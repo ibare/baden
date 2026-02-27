@@ -1,9 +1,12 @@
 import Database, { type Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import os from 'os';
+import fs from 'fs';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.resolve(__dirname, '../../../data/baden.db');
+const badenHome = path.join(os.homedir(), '.baden');
+fs.mkdirSync(badenHome, { recursive: true });
+
+const DB_PATH = process.env.DB_PATH || path.join(badenHome, 'baden.db');
 
 const db: DatabaseType = new Database(DB_PATH);
 
@@ -229,6 +232,58 @@ if (!hasActionPrefixes) {
   }
 
   console.log('[DB] Migration complete: action_prefixes table created');
+}
+
+// Migration: create detail_keywords table
+const hasDetailKeywords = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='detail_keywords'").get();
+if (!hasDetailKeywords) {
+  console.log('[DB] Migrating: creating detail_keywords table...');
+  db.exec(`
+    CREATE TABLE detail_keywords (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      keyword TEXT NOT NULL,
+      category TEXT NOT NULL,
+      UNIQUE(project_id, keyword)
+    );
+    CREATE INDEX idx_detail_keywords_project ON detail_keywords(project_id);
+  `);
+
+  // Seed default keywords for existing projects
+  const projectRows2 = db.prepare("SELECT id FROM projects").all() as { id: string }[];
+  if (projectRows2.length > 0) {
+    console.log('[DB] Seeding detail_keywords...');
+    const keywordSeed: { keyword: string; category: string }[] = [
+      { keyword: 'test', category: 'verification' },
+      { keyword: 'tests', category: 'verification' },
+      { keyword: 'spec', category: 'verification' },
+      { keyword: 'lint', category: 'verification' },
+      { keyword: 'error', category: 'debugging' },
+      { keyword: 'bug', category: 'debugging' },
+      { keyword: 'debug', category: 'debugging' },
+      { keyword: 'rule', category: 'rule_compliance' },
+      { keyword: 'rules', category: 'rule_compliance' },
+      { keyword: 'doc', category: 'exploration' },
+      { keyword: 'docs', category: 'exploration' },
+      { keyword: 'plan', category: 'planning' },
+      { keyword: 'design', category: 'planning' },
+    ];
+    const insertKw = db.prepare(`
+      INSERT OR IGNORE INTO detail_keywords (project_id, keyword, category)
+      VALUES (?, ?, ?)
+    `);
+    const tx2 = db.transaction(() => {
+      for (const proj of projectRows2) {
+        for (const kw of keywordSeed) {
+          insertKw.run(proj.id, kw.keyword, kw.category);
+        }
+      }
+    });
+    tx2();
+    console.log(`[DB] Seeded ${keywordSeed.length} keywords for ${projectRows2.length} project(s)`);
+  }
+
+  console.log('[DB] Migration complete: detail_keywords table created');
 }
 
 db.pragma('foreign_keys = ON');

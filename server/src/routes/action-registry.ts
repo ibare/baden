@@ -10,6 +10,10 @@ import {
   createPrefix,
   updatePrefix,
   deletePrefix,
+  getKeywords,
+  createKeyword,
+  updateKeyword,
+  deleteKeyword,
 } from '../services/action-registry.js';
 import { broadcastRegistryUpdate } from '../ws.js';
 
@@ -183,6 +187,74 @@ actionRegistryRouter.delete('/prefixes/:id', (req: Req<{ projectId: string; id: 
     const deleted = deletePrefix(id);
     if (!deleted) {
       res.status(404).json({ error: 'Prefix not found' });
+      return;
+    }
+    broadcastRegistryUpdate(projectId);
+    res.json({ ok: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// ────── Keyword endpoints ──────
+
+// GET /api/projects/:projectId/action-registry/keywords
+actionRegistryRouter.get('/keywords', (req: Req<{ projectId: string }>, res) => {
+  try {
+    const keywords = getKeywords(req.params.projectId);
+    res.json(keywords);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// POST /api/projects/:projectId/action-registry/keywords
+actionRegistryRouter.post('/keywords', (req: Req<{ projectId: string }>, res) => {
+  try {
+    const { projectId } = req.params;
+    const { keyword, category } = req.body;
+    if (!keyword || !category) {
+      res.status(400).json({ error: 'keyword and category are required' });
+      return;
+    }
+    const created = createKeyword(projectId, { keyword, category });
+    broadcastRegistryUpdate(projectId);
+    res.status(201).json(created);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// PUT /api/projects/:projectId/action-registry/keywords/:id
+actionRegistryRouter.put('/keywords/:id', (req: Req<{ projectId: string; id: string }>, res) => {
+  try {
+    const { projectId } = req.params;
+    const id = Number(req.params.id);
+    const { keyword, category } = req.body;
+    const updated = updateKeyword(id, { keyword, category });
+    if (!updated) {
+      res.status(404).json({ error: 'Keyword not found' });
+      return;
+    }
+    broadcastRegistryUpdate(projectId);
+    res.json(updated);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// DELETE /api/projects/:projectId/action-registry/keywords/:id
+actionRegistryRouter.delete('/keywords/:id', (req: Req<{ projectId: string; id: string }>, res) => {
+  try {
+    const { projectId } = req.params;
+    const id = Number(req.params.id);
+    const deleted = deleteKeyword(id);
+    if (!deleted) {
+      res.status(404).json({ error: 'Keyword not found' });
       return;
     }
     broadcastRegistryUpdate(projectId);

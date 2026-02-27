@@ -76,6 +76,13 @@ export interface ActionPrefix {
   sort_order: number;
 }
 
+export interface DetailKeyword {
+  id: number;
+  project_id: string;
+  keyword: string;
+  category: string;
+}
+
 export const api = {
   getProjects: () => request<Project[]>('/projects'),
   getProject: (id: string) => request<Project & { rules: Rule[] }>(`/projects/${id}`),
@@ -147,4 +154,23 @@ export const api = {
 
   deletePrefix: (projectId: string, id: number) =>
     request<{ ok: boolean }>(`/projects/${projectId}/action-registry/prefixes/${id}`, { method: 'DELETE' }),
+
+  // Detail Keywords
+  getKeywords: (projectId: string) =>
+    request<DetailKeyword[]>(`/projects/${projectId}/action-registry/keywords`),
+
+  createKeyword: (projectId: string, data: { keyword: string; category: string }) =>
+    request<DetailKeyword>(`/projects/${projectId}/action-registry/keywords`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  updateKeyword: (projectId: string, id: number, data: Partial<Pick<DetailKeyword, 'keyword' | 'category'>>) =>
+    request<DetailKeyword>(`/projects/${projectId}/action-registry/keywords/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  deleteKeyword: (projectId: string, id: number) =>
+    request<{ ok: boolean }>(`/projects/${projectId}/action-registry/keywords/${id}`, { method: 'DELETE' }),
 };

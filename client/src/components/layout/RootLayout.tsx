@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Outlet } from 'react-router-dom';
-import type { Project, ActionPrefix } from '@/lib/api';
+import type { Project, ActionPrefix, DetailKeyword } from '@/lib/api';
 import { useProject } from '@/hooks/useProjectContext';
 import { useActionRegistry } from '@/hooks/useActionRegistry';
 import type { ResolvedAction } from '@/hooks/useActionRegistry';
@@ -10,6 +10,7 @@ import { Sidebar } from './Sidebar';
 
 export interface RootOutletContext {
   prefixes: ActionPrefix[];
+  keywords: DetailKeyword[];
   resolveAction: (action: string | null, type: string) => ResolvedAction;
   resolveCategory: (action: string | null, type: string) => EventCategory;
   resolveIcon: (action: string | null) => string | null;
@@ -20,7 +21,7 @@ export interface RootOutletContext {
 
 export function RootLayout() {
   const { projects, selectedProject, setSelectedProject, addProject } = useProject();
-  const { prefixes, resolveAction, resolveCategory, resolveIcon, refresh: refreshRegistry } =
+  const { prefixes, keywords, resolveAction, resolveCategory, resolveIcon, refresh: refreshRegistry } =
     useActionRegistry(selectedProject);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [connected, setConnected] = useState(false);
@@ -35,6 +36,7 @@ export function RootLayout() {
 
   const outletContext: RootOutletContext = {
     prefixes,
+    keywords,
     resolveAction,
     resolveCategory,
     resolveIcon,

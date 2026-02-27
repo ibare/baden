@@ -95,6 +95,78 @@ export function extractPrefix(
   return null;
 }
 
+// ────── Detail Keywords ──────
+
+export interface DetailKeyword {
+  id: number;
+  project_id: string;
+  keyword: string;
+  category: string;
+}
+
+const keywordCache = new Map<string, DetailKeyword[]>();
+
+const selectKeywords = db.prepare(`
+  SELECT * FROM detail_keywords WHERE project_id = ? ORDER BY length(keyword) DESC
+`);
+
+const selectKeywordById = db.prepare(`SELECT * FROM detail_keywords WHERE id = ?`);
+
+const insertKeywordStmt = db.prepare(`
+  INSERT INTO detail_keywords (project_id, keyword, category)
+  VALUES (?, ?, ?)
+`);
+
+const updateKeywordStmt = db.prepare(`
+  UPDATE detail_keywords SET keyword = ?, category = ?
+  WHERE id = ?
+`);
+
+const deleteKeywordStmt = db.prepare(`DELETE FROM detail_keywords WHERE id = ?`);
+
+export function invalidateKeywordCache(projectId: string): void {
+  keywordCache.delete(projectId);
+}
+
+export function getKeywords(projectId: string): DetailKeyword[] {
+  if (keywordCache.has(projectId)) return keywordCache.get(projectId)!;
+  const rows = selectKeywords.all(projectId) as DetailKeyword[];
+  keywordCache.set(projectId, rows);
+  return rows;
+}
+
+export function createKeyword(
+  projectId: string,
+  data: { keyword: string; category: string },
+): DetailKeyword {
+  const result = insertKeywordStmt.run(projectId, data.keyword, data.category);
+  invalidateKeywordCache(projectId);
+  return selectKeywordById.get(result.lastInsertRowid) as DetailKeyword;
+}
+
+export function updateKeyword(
+  id: number,
+  data: { keyword?: string; category?: string },
+): DetailKeyword | null {
+  const existing = selectKeywordById.get(id) as DetailKeyword | undefined;
+  if (!existing) return null;
+  updateKeywordStmt.run(
+    data.keyword !== undefined ? data.keyword : existing.keyword,
+    data.category !== undefined ? data.category : existing.category,
+    id,
+  );
+  invalidateKeywordCache(existing.project_id);
+  return selectKeywordById.get(id) as DetailKeyword;
+}
+
+export function deleteKeyword(id: number): boolean {
+  const existing = selectKeywordById.get(id) as DetailKeyword | undefined;
+  if (!existing) return false;
+  deleteKeywordStmt.run(id);
+  invalidateKeywordCache(existing.project_id);
+  return true;
+}
+
 // ────── Action Registry (existing — action log collection) ──────
 
 export interface ActionRegistryEntry {

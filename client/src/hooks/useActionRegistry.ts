@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '@/lib/api';
-import type { ActionPrefix } from '@/lib/api';
+import type { ActionPrefix, DetailKeyword } from '@/lib/api';
 import type { EventCategory } from '@/lib/event-types';
 import { EVENT_CATEGORY_MAP } from '@/lib/event-types';
 
@@ -31,19 +31,25 @@ export interface ResolvedAction {
 
 export function useActionRegistry(projectId: string | null) {
   const [prefixes, setPrefixes] = useState<ActionPrefix[]>([]);
+  const [keywords, setKeywords] = useState<DetailKeyword[]>([]);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!projectId) {
       setPrefixes([]);
+      setKeywords([]);
       return;
     }
     setLoading(true);
     try {
-      const data = await api.getPrefixes(projectId);
-      setPrefixes(data);
+      const [prefixData, keywordData] = await Promise.all([
+        api.getPrefixes(projectId),
+        api.getKeywords(projectId),
+      ]);
+      setPrefixes(prefixData);
+      setKeywords(keywordData);
     } catch (err) {
-      console.error('[ActionRegistry] Failed to load prefixes:', err);
+      console.error('[ActionRegistry] Failed to load registry:', err);
     } finally {
       setLoading(false);
     }
@@ -59,16 +65,36 @@ export function useActionRegistry(projectId: string | null) {
     [prefixes],
   );
 
+  // Keywords sorted by length descending (longest match first)
+  const sortedKeywords = useMemo(
+    () => [...keywords].sort((a, b) => b.keyword.length - a.keyword.length),
+    [keywords],
+  );
+
   const resolveAction = useCallback(
     (action: string | null, type: string): ResolvedAction => {
       if (action) {
         for (const p of sortedPrefixes) {
           if (action === p.prefix || action.startsWith(p.prefix + '_')) {
             const detail = action === p.prefix ? '' : action.slice(p.prefix.length + 1);
+
+            // 2단 분류: detail keyword가 prefix default_category를 오버라이드
+            let category = p.category as EventCategory;
+            if (detail) {
+              const d = detail.toLowerCase();
+              for (const kw of sortedKeywords) {
+                if (d === kw.keyword || d.startsWith(kw.keyword + '_') ||
+                    d.endsWith('_' + kw.keyword) || d.includes('_' + kw.keyword + '_')) {
+                  category = kw.category as EventCategory;
+                  break;
+                }
+              }
+            }
+
             return {
               prefix: p.prefix,
               detail,
-              category: p.category as EventCategory,
+              category,
               label: p.label,
               icon: p.icon,
               keyword: extractDetailKeyword(detail),
@@ -87,7 +113,7 @@ export function useActionRegistry(projectId: string | null) {
         keyword: null,
       };
     },
-    [sortedPrefixes],
+    [sortedPrefixes, sortedKeywords],
   );
 
   // Backward-compatible wrappers
@@ -106,5 +132,5 @@ export function useActionRegistry(projectId: string | null) {
     [resolveAction],
   );
 
-  return { prefixes, loading, resolveAction, resolveCategory, resolveIcon, refresh };
+  return { prefixes, keywords, loading, resolveAction, resolveCategory, resolveIcon, refresh };
 }

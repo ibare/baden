@@ -7,7 +7,7 @@ import { ActionRegistryPanel } from '@/components/domain/ActionRegistryPanel';
 
 export function ActionRegistryPage() {
   const { selectedProject } = useProject();
-  const { prefixes, refreshRegistry, setConnected } =
+  const { prefixes, keywords, refreshRegistry, setConnected } =
     useOutletContext<RootOutletContext>();
 
   const { connected } = useWebSocket({
@@ -22,7 +22,7 @@ export function ActionRegistryPage() {
   if (!selectedProject) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
-        프로젝트를 먼저 선택하세요
+        Select a project first
       </div>
     );
   }
@@ -32,6 +32,7 @@ export function ActionRegistryPage() {
       <ActionRegistryPanel
         projectId={selectedProject}
         prefixes={prefixes}
+        keywords={keywords}
         onRefresh={refreshRegistry}
       />
     </div>
