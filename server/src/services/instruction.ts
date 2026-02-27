@@ -25,6 +25,17 @@ curl -s -X POST http://localhost:3800/api/query -H "Content-Type: application/js
 /tmp/baden '"action":"analyze_token_refresh_bug","reason":"사용자가 로그인 페이지의 OAuth 토큰 갱신 버그를 수정하라고 요청. 토큰 만료 시 자동 갱신이 실패하는 문제로, auth/login.ts와 lib/oauth.ts 수정이 필요할 것으로 판단","taskId":"550e8400-e29b-41d4-a716-446655440000","prompt":"로그인 페이지에서 OAuth 토큰 갱신이 안 되는 버그 수정해줘"'
 \`\`\`
 
+## 계획 수립 보고
+
+코드를 읽거나 수정하지 않더라도, **접근 방식을 결정하거나 계획을 세울 때** 보고하라.
+계획 모드(plan mode)에 진입했을 때도 동일하게 보고한다.
+
+\`\`\`bash
+# 예시 — 계획 단계에서의 보고
+/tmp/baden '"action":"plan_refactor_approach","reason":"컴포넌트 분리 방식 3가지를 비교 분석하여 최적 접근법 결정","taskId":"..."'
+/tmp/baden '"action":"decide_state_management","reason":"Redux vs Context vs Zustand 비교 후 Zustand 선택. 번들 크기와 보일러플레이트 최소화 기준","taskId":"..."'
+\`\`\`
+
 ## 행동 보고
 
 이후 모든 행동을 실행하기 **전에** 보고하고, 응답을 확인한 뒤 실행하라.
@@ -61,6 +72,7 @@ curl -s -X POST http://localhost:3800/api/query -H "Content-Type: application/js
 
 ## 원칙
 - **보고 없이 행동하지 마라.** 파일 읽기, 검색, 테스트 실행 등 모든 행동은 Baden에 보고한 뒤 수행한다.
+- **계획 수립도 보고하라.** 접근 방식 결정, 계획 작성 등 도구를 사용하지 않는 사고 과정도 보고 대상이다.
 - **응답을 확인하라.** Baden의 응답을 확인한 후 다음 단계로 넘어가라.
 - **키워드가 아닌 문장으로 기술하라.** reason 필드에는 나중에 읽어도 맥락을 이해할 수 있는 구체적인 설명을 작성하라.
 - **action은 자유롭게 서술하라.** 고정된 목록이 아닌, 수행할 행동을 요약하는 \`snake_case\` 키워드를 직접 만들어 사용하라.
