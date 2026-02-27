@@ -1,0 +1,29 @@
+{
+  "name": "baden",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "baden": "./bin/baden.js"
+  },
+  "files": [
+    "bin/",
+    "server/dist/",
+    "server/package.json",
+    "client/dist/"
+  ],
+  "scripts": {
+    "build": "cd client && npm ci && npm run build && cd ../server && npm ci && npm run build",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^5.0.9",
+    "ws": "^8.18.0",
+    "yaml": "^2.6.0"
+  }
+}
