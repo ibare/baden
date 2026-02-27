@@ -94,13 +94,13 @@ export function computeLanes(
   let y = LANE_PAD_TOP;
 
   const categoryLabels: Record<EventCategory, string> = {
-    user: '사용자',
-    exploration: '탐색',
-    planning: '계획',
-    implementation: '구현',
-    verification: '검증',
-    debugging: '디버깅',
-    rule_compliance: '규칙',
+    user: 'User',
+    exploration: 'Exploration',
+    planning: 'Planning',
+    implementation: 'Implementation',
+    verification: 'Verification',
+    debugging: 'Debugging',
+    rule_compliance: 'Rules',
   };
 
   const detailH = DETAIL_HEIGHTS[expandLevel ?? 0];

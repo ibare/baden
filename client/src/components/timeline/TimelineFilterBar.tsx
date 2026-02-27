@@ -32,7 +32,7 @@ function shiftDate(dateStr: string, delta: number): string {
 
 function formatDateDisplay(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
 export const TimelineFilterBar = memo(function TimelineFilterBar({
@@ -91,7 +91,7 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
         <MagnifyingGlass size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
-          placeholder="검색..."
+          placeholder="Search..."
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="h-7 text-xs pl-7"
@@ -119,7 +119,7 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
             : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
         )}
         title={
-          expandLevel === 0 ? '하단 표시' : expandLevel === 1 ? '하단 넓히기' : '하단 없음'
+          expandLevel === 0 ? 'Show detail' : expandLevel === 1 ? 'Expand detail' : 'Hide detail'
         }
       >
         <Rows size={14} weight={expandLevel === 2 ? 'bold' : expandLevel === 1 ? 'regular' : 'thin'} />
@@ -135,7 +135,7 @@ export const TimelineFilterBar = memo(function TimelineFilterBar({
             ? 'text-primary bg-primary/10'
             : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
         )}
-        title={autoFollow ? '자동 추적 끄기' : '자동 추적 켜기'}
+        title={autoFollow ? 'Disable auto-follow' : 'Enable auto-follow'}
       >
         <Crosshair size={14} weight={autoFollow ? 'bold' : 'regular'} />
       </button>

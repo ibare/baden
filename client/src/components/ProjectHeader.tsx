@@ -15,7 +15,7 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
     return (
       <div className="px-6 py-4 border-b border-border">
         <p className="text-sm text-muted-foreground">
-          사이드바에서 프로젝트를 선택하세요
+          Select a project from the sidebar
         </p>
       </div>
     );
@@ -51,7 +51,7 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
         ) : (
           <ClipboardText size={14} />
         )}
-        {copied ? '복사됨' : '프로토콜 복사'}
+        {copied ? 'Copied' : 'Copy Protocol'}
       </Button>
     </div>
   );

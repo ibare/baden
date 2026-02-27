@@ -54,7 +54,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
             <span className="truncate">{value}</span>
           </>
         ) : (
-          <span className="text-muted-foreground">아이콘 선택</span>
+          <span className="text-muted-foreground">Select icon</span>
         )}
       </button>
 
@@ -65,21 +65,21 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
             <input
               ref={inputRef}
               type="text"
-              placeholder="아이콘 이름으로 검색 (예: Shield, Brain, Code...)"
+              placeholder="Search icons (e.g. Shield, Brain, Code...)"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full px-2 py-1 rounded border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               autoFocus
             />
             <div className="flex items-center justify-between mt-1.5 text-[10px] text-muted-foreground">
-              <span>{filtered.length}개 아이콘</span>
+              <span>{filtered.length} icons</span>
               {value && (
                 <button
                   type="button"
                   onClick={() => { onChange(null); setOpen(false); }}
                   className="text-red-500 hover:underline"
                 >
-                  선택 해제
+                  Clear
                 </button>
               )}
             </div>
@@ -117,7 +117,7 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
                 onClick={() => setPage((p) => p - 1)}
                 className="px-1.5 py-0.5 rounded border border-border hover:bg-muted/50 disabled:opacity-30"
               >
-                이전
+                Prev
               </button>
               <span>{page + 1} / {totalPages}</span>
               <button
@@ -125,14 +125,14 @@ export function IconPicker({ value, onChange }: IconPickerProps) {
                 onClick={() => setPage((p) => p + 1)}
                 className="px-1.5 py-0.5 rounded border border-border hover:bg-muted/50 disabled:opacity-30"
               >
-                다음
+                Next
               </button>
             </div>
           )}
 
           {filtered.length === 0 && (
             <div className="p-3 text-center text-xs text-muted-foreground">
-              검색 결과 없음
+              No results
             </div>
           )}
         </div>

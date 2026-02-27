@@ -37,10 +37,10 @@ function parseDetail(raw: string | null): Record<string, string> | null {
 }
 
 const TRIGGER_LABELS: Record<string, string> = {
-  paths: '경로',
-  patterns: '패턴',
-  imports: '임포트',
-  events: '이벤트',
+  paths: 'Paths',
+  patterns: 'Patterns',
+  imports: 'Imports',
+  events: 'Events',
 };
 
 function parseTriggers(raw: string | null): Record<string, string[]> | null {
@@ -121,11 +121,11 @@ function RuleContentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[80vw] max-w-[800px] sm:max-w-[800px] max-h-[80vh] flex flex-col overflow-hidden">
         <DialogHeader className="shrink-0">
-          <DialogTitle>{title ?? '로딩 중...'}</DialogTitle>
+          <DialogTitle>{title ?? 'Loading...'}</DialogTitle>
         </DialogHeader>
         {loading ? (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            로딩 중...
+            Loading...
           </div>
         ) : body !== null ? (
           <div className="overflow-y-auto min-h-0 prose prose-sm dark:prose-invert max-w-none prose-headings:mt-4 prose-headings:mb-2 prose-p:my-2 prose-pre:my-2 prose-ul:my-2 prose-ol:my-2 prose-table:my-2 prose-code:before:content-none prose-code:after:content-none">
@@ -159,7 +159,7 @@ function RuleContentDialog({
           </div>
         ) : (
           <div className="overflow-y-auto min-h-0 text-sm text-muted-foreground py-4">
-            파일을 불러올 수 없습니다.
+            Failed to load file.
           </div>
         )}
       </DialogContent>
@@ -227,7 +227,7 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
           ) : rule.triggers ? (
             <Row label="Triggers">{rule.triggers}</Row>
           ) : null}
-          {ruleEventCount !== undefined && <Row label="Events">{ruleEventCount}건</Row>}
+          {ruleEventCount !== undefined && <Row label="Events">{ruleEventCount}</Row>}
         </dl>
         <RuleContentDialog
           open={dialogOpen}
@@ -243,7 +243,7 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
   if (!event) {
     return (
       <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-        이벤트를 클릭하면 상세 정보가 표시됩니다
+        Click an event to see details
       </div>
     );
   }
@@ -251,7 +251,7 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
   const category = EVENT_CATEGORY_MAP[event.type];
   const catConfig = category ? CATEGORY_CONFIG[category] : null;
   const typeConfig = TYPE_CONFIG[event.type];
-  const time = new Date(event.timestamp).toLocaleTimeString('ko-KR');
+  const time = new Date(event.timestamp).toLocaleTimeString('en-US', { hour12: false });
   const detail = parseDetail(event.detail);
 
   const hasActivity = event.message || event.summary || event.result || event.prompt;

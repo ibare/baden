@@ -59,7 +59,7 @@ export function EventDrawer({
 
   const header = (
     <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-      <h3 className="text-sm font-semibold text-foreground">상세 정보</h3>
+      <h3 className="text-sm font-semibold text-foreground">Details</h3>
       <div className="flex items-center gap-1">
         <button
           onClick={onTogglePin}
@@ -69,7 +69,7 @@ export function EventDrawer({
               ? 'text-foreground bg-muted/60 hover:bg-muted'
               : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
           )}
-          title={pinned ? '고정 해제' : '사이드바 고정'}
+          title={pinned ? 'Unpin' : 'Pin to sidebar'}
         >
           {pinned ? <PushPinSlash size={14} /> : <PushPin size={14} />}
         </button>

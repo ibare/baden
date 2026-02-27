@@ -51,7 +51,7 @@ export function CreateProjectDialog({ onCreated, children }: CreateProjectDialog
       setOpen(false);
       onCreated(project);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '프로젝트 생성 실패');
+      setError(err instanceof Error ? err.message : 'Failed to create project');
     } finally {
       setLoading(false);
     }
@@ -68,12 +68,12 @@ export function CreateProjectDialog({ onCreated, children }: CreateProjectDialog
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>새 프로젝트</DialogTitle>
-          <DialogDescription>모니터링할 프로젝트를 등록합니다.</DialogDescription>
+          <DialogTitle>New Project</DialogTitle>
+          <DialogDescription>Register a project to monitor.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="project-name">이름 *</Label>
+            <Label htmlFor="project-name">Name *</Label>
             <Input
               id="project-name"
               value={name}
@@ -83,16 +83,16 @@ export function CreateProjectDialog({ onCreated, children }: CreateProjectDialog
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="project-desc">설명</Label>
+            <Label htmlFor="project-desc">Description</Label>
             <Input
               id="project-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="프로젝트 설명 (선택)"
+              placeholder="Project description (optional)"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="project-rules">규칙 경로 *</Label>
+            <Label htmlFor="project-rules">Rules Path *</Label>
             <Input
               id="project-rules"
               value={rulesPath}
@@ -106,10 +106,10 @@ export function CreateProjectDialog({ onCreated, children }: CreateProjectDialog
           )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              취소
+              Cancel
             </Button>
             <Button type="submit" disabled={loading || !name.trim() || !rulesPath.trim()}>
-              {loading ? '생성 중...' : '등록'}
+              {loading ? 'Creating...' : 'Create'}
             </Button>
           </DialogFooter>
         </form>

@@ -24,7 +24,7 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
       onChange={(e) => onChange(e.target.value)}
       className="w-full px-2 py-1.5 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-1 focus:ring-primary"
     >
-      <option value="">-- 카테고리 선택 --</option>
+      <option value="">-- Select category --</option>
       {CATEGORIES.map((cat) => {
         const config = CATEGORY_CONFIG[cat];
         const colors = CATEGORY_COLORS[cat];

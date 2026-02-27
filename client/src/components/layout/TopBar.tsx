@@ -13,7 +13,7 @@ export function TopBar({ connected, sidebarOpen, onToggleSidebar }: TopBarProps)
         <button
           onClick={onToggleSidebar}
           className="p-1 rounded-md hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-          title={sidebarOpen ? '사이드바 닫기' : '사이드바 열기'}
+          title={sidebarOpen ? 'Close sidebar' : 'Open sidebar'}
         >
           <List size={18} weight="bold" />
         </button>
@@ -26,7 +26,7 @@ export function TopBar({ connected, sidebarOpen, onToggleSidebar }: TopBarProps)
           className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-red-500'}`}
         />
         <span className="text-xs text-muted-foreground">
-          {connected ? '연결됨' : '연결 끊김'}
+          {connected ? 'Connected' : 'Disconnected'}
         </span>
       </div>
     </header>

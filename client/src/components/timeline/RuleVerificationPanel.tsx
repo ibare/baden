@@ -25,7 +25,7 @@ const resultLabel: Record<'pass' | 'issue', string> = {
 
 function formatTime(ts: string): string {
   const d = new Date(ts);
-  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 }
 
 function formatDuration(startTs: string, endTs: string): string {
@@ -70,7 +70,7 @@ export function RuleVerificationPanel({ events, selectedEventId, onClose, onSele
       <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
         {cycles.length === 0 ? (
           <div className="text-xs text-muted-foreground text-center py-8">
-            검증 사이클이 없습니다
+            No verification cycles
           </div>
         ) : (
           cycles.map((cycle) => (

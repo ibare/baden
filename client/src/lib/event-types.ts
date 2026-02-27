@@ -66,20 +66,20 @@ export interface EventTypeGroup {
 }
 
 export const EVENT_TYPE_GROUPS: EventTypeGroup[] = [
-  { label: '탐색', types: ['code_search', 'doc_read', 'dependency_check', 'file_read'] },
-  { label: '계획', types: ['task_analysis', 'approach_decision', 'task_complete'] },
-  { label: '구현', types: ['code_create', 'code_modify', 'refactor', 'file_write'] },
-  { label: '검증', types: ['test_run', 'build_run', 'lint_run'] },
-  { label: '디버깅', types: ['error_encountered', 'error_resolved'] },
-  { label: '규칙', types: ['rule_match', 'violation_found', 'fix_applied'] },
+  { label: 'Exploration', types: ['code_search', 'doc_read', 'dependency_check', 'file_read'] },
+  { label: 'Planning', types: ['task_analysis', 'approach_decision', 'task_complete'] },
+  { label: 'Implementation', types: ['code_create', 'code_modify', 'refactor', 'file_write'] },
+  { label: 'Verification', types: ['test_run', 'build_run', 'lint_run'] },
+  { label: 'Debugging', types: ['error_encountered', 'error_resolved'] },
+  { label: 'Rules', types: ['rule_match', 'violation_found', 'fix_applied'] },
 ];
 
 export const CATEGORY_CONFIG: Record<EventCategory, { label: string; color: string }> = {
-  user: { label: '사용자', color: 'blue' },
-  exploration: { label: '탐색', color: 'teal' },
-  planning: { label: '계획', color: 'purple' },
-  implementation: { label: '구현', color: 'orange' },
-  verification: { label: '검증', color: 'yellow' },
-  debugging: { label: '디버깅', color: 'amber' },
-  rule_compliance: { label: '규칙', color: 'rose' },
+  user: { label: 'User', color: 'blue' },
+  exploration: { label: 'Exploration', color: 'teal' },
+  planning: { label: 'Planning', color: 'purple' },
+  implementation: { label: 'Implementation', color: 'orange' },
+  verification: { label: 'Verification', color: 'yellow' },
+  debugging: { label: 'Debugging', color: 'amber' },
+  rule_compliance: { label: 'Rules', color: 'rose' },
 };

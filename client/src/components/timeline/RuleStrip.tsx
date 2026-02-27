@@ -11,10 +11,10 @@ interface RuleStripProps {
 type EventKind = 'check' | 'violation' | 'pass' | 'fix';
 
 const kindConfig: Record<EventKind, { label: string; color: string }> = {
-  check: { label: '체크', color: 'bg-blue-500/15 text-blue-600 border-blue-500/40' },
-  violation: { label: '위반', color: 'bg-red-500/15 text-red-600 border-red-500/40' },
-  pass: { label: '통과', color: 'bg-green-500/15 text-green-600 border-green-500/40' },
-  fix: { label: '수정', color: 'bg-amber-500/15 text-amber-600 border-amber-500/40' },
+  check: { label: 'Check', color: 'bg-blue-500/15 text-blue-600 border-blue-500/40' },
+  violation: { label: 'Violation', color: 'bg-red-500/15 text-red-600 border-red-500/40' },
+  pass: { label: 'Pass', color: 'bg-green-500/15 text-green-600 border-green-500/40' },
+  fix: { label: 'Fix', color: 'bg-amber-500/15 text-amber-600 border-amber-500/40' },
 };
 
 const kindOrder: EventKind[] = ['check', 'violation', 'pass', 'fix'];

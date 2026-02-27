@@ -20,9 +20,9 @@ export function Timeline({
   rawEvents,
   selectedDate,
   onDateChange,
-  eventDates,
+  eventDates: _eventDates,
   activeCategories,
-  onToggleCategory,
+  onToggleCategory: _onToggleCategory,
   search,
   onSearchChange,
   onSelectEvent,
@@ -212,7 +212,7 @@ export function Timeline({
       <div ref={wrapperRef} className="flex-1 min-h-0 relative">
         {events.length === 0 ? (
           <div className="flex items-center justify-center w-full h-full text-sm text-muted-foreground">
-            이벤트가 없습니다
+            No events
           </div>
         ) : (
           <>
