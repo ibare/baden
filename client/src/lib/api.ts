@@ -86,10 +86,6 @@ export interface DetailKeyword {
 export const api = {
   getProjects: () => request<Project[]>('/projects'),
   getProject: (id: string) => request<Project & { rules: Rule[] }>(`/projects/${id}`),
-  getInstruction: async (id: string) => {
-    const res = await fetch(`${BASE}/projects/${id}/instruction`);
-    return res.text();
-  },
   getRules: (projectId: string) => request<Rule[]>(`/projects/${projectId}/rules`),
   getRuleContent: (projectId: string, ruleId: string) =>
     request<{ title: string; body: string }>(`/projects/${projectId}/rules/${ruleId}/content`),

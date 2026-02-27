@@ -4,7 +4,6 @@ import { Router } from 'express';
 import { nanoid } from 'nanoid';
 import db from '../db/connection.js';
 import { parseRules } from '../services/rule-parser.js';
-import { generateInstruction } from '../services/instruction.js';
 import type { Project, Rule } from '../types.js';
 
 export const projectsRouter = Router();
@@ -82,19 +81,6 @@ projectsRouter.get('/:id', (req, res) => {
 
   const rules = db.prepare('SELECT * FROM rules WHERE project_id = ?').all(req.params.id);
   res.json({ ...project as object, rules });
-});
-
-// GET /api/projects/:id/instruction - 프로토콜 지시 텍스트
-projectsRouter.get('/:id/instruction', (req, res) => {
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id) as Project | undefined;
-  if (!project) {
-    res.status(404).json({ error: 'Project not found' });
-    return;
-  }
-
-  const rules = db.prepare('SELECT * FROM rules WHERE project_id = ?').all(req.params.id) as Rule[];
-  const instruction = generateInstruction(project, rules);
-  res.type('text/plain').send(instruction);
 });
 
 // GET /api/projects/:id/rules - 규칙 목록

@@ -12,7 +12,8 @@
     "client/dist/"
   ],
   "scripts": {
-    "build": "cd client && npm ci && npm run build && cd ../server && npm ci && npm run build",
+    "build": "cd client && npm ci && npm run build && cd ../server && npm ci && npm run build && cd ../mcp && npm ci && npm run build",
+    "build:mcp": "cd mcp && npm install && npm run build",
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",
     "prepublishOnly": "npm run build"
