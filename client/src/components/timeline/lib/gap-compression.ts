@@ -1,4 +1,4 @@
-import type { TimelineItem, TimeSegment, CompressedTimeMap, SegmentType } from './types';
+import type { TimelineItem, TimeSegment, CompressedTimeMap } from './types';
 import {
   GAP_THRESHOLD_MS,
   COMPRESSED_GAP_PX,

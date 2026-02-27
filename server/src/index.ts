@@ -1,8 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
-import { URL } from 'url';
+import { URL, fileURLToPath } from 'url';
 import { initializeDatabase } from './db/schema.js';
 import { addClient, removeClient } from './ws.js';
 import { projectsRouter } from './routes/projects.js';
@@ -10,7 +12,8 @@ import { eventsRouter } from './routes/events.js';
 import { queryRouter } from './routes/query.js';
 import { actionRegistryRouter } from './routes/action-registry.js';
 
-const PORT = 3800;
+const PORT = Number(process.env.PORT) || 3800;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 app.use(cors());
@@ -40,6 +43,19 @@ app.use('/api/projects/:projectId/action-registry', actionRegistryRouter);
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Static files — serve client build in production
+const clientDir = process.env.CLIENT_DIR || path.resolve(__dirname, '../client');
+const clientIndex = path.join(clientDir, 'index.html');
+
+if (fs.existsSync(clientIndex)) {
+  app.use(express.static(clientDir));
+
+  // SPA fallback — all non-API/WS GET requests serve index.html
+  app.get('*', (_req, res) => {
+    res.sendFile(clientIndex);
+  });
+}
 
 // HTTP server
 const server = createServer(app);
