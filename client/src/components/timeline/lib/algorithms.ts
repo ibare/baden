@@ -128,8 +128,9 @@ export function computeLanes(
       densityBonus = Math.round(density * 2) * rowUnit;
     }
 
-    const minLaneHeight = (expandLevel ?? 0) > 0 ? rowUnit : MIN_LANE_HEIGHT;
-    const height = Math.max(minLaneHeight, subRowHeight + densityBonus);
+    const LANE_INNER_PAD = 10;
+    const minLaneHeight = (expandLevel ?? 0) > 0 ? rowUnit + LANE_INNER_PAD : MIN_LANE_HEIGHT;
+    const height = Math.max(minLaneHeight, subRowHeight + densityBonus + LANE_INNER_PAD);
     lanes.push({ category: cat, label: categoryLabels[cat], subRowCount: subRows, y, height });
     y += height + LANE_GAP;
   }
@@ -181,7 +182,7 @@ export function placeItems(
       const detailH = DETAIL_HEIGHTS[expandLevel ?? 0];
       const rowUnit = SUB_ROW_HEIGHT + detailH;
       const itemHeight = BAR_HEIGHT + detailH;
-      const y = lane.y + subRow * rowUnit + (rowUnit - itemHeight) / 2;
+      const y = lane.y + 10 + subRow * rowUnit + (rowUnit - itemHeight) / 2;
 
       placed.push({ ...item, lane: laneIdx, subRow, x, width, y });
     }

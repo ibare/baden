@@ -16,7 +16,7 @@ export const TimelineLaneLabels = memo(
     return (
       <div
         ref={ref}
-        className="flex-shrink-0 relative overflow-hidden"
+        className="flex-shrink-0 relative overflow-hidden border-r border-border"
         style={{ width: LABEL_WIDTH }}
       >
         <div style={{ transform: `translateY(${-scrollTop}px)` }}>

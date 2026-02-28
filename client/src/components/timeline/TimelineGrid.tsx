@@ -112,7 +112,7 @@ export const TimelineGrid = memo(function TimelineGrid({
           x2="100%"
           y2={lane.y}
           stroke="currentColor"
-          strokeOpacity={0.12}
+          strokeOpacity={0.3}
           strokeWidth={1}
         />
       ))}
