@@ -23,15 +23,13 @@ export function AppLayout() {
   // Data
   const [rules, setRules] = useState<Rule[]>([]);
   const [events, setEvents] = useState<RuleEvent[]>([]);
-  const [eventDates, setEventDates] = useState<string[]>([]);
+  const [eventDates, setEventDates] = useState<{ date: string; count: number }[]>([]);
 
   // Timeline filters
   const [selectedDate, setSelectedDate] = useState(todayUTC);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
     new Set(['user', 'exploration', 'planning', 'implementation', 'rule_compliance']),
   );
-  const [search, setSearch] = useState('');
-
   // Drawer
   const [drawerEvent, setDrawerEvent] = useState<RuleEvent | null>(null);
   const [drawerRule, setDrawerRule] = useState<Rule | null>(null);
@@ -54,8 +52,9 @@ export function AppLayout() {
     api.getRules(selectedProject).then(setRules).catch(console.error);
     api.getEventDates(selectedProject).then((dates) => {
       setEventDates(dates);
-      if (dates.length > 0 && !dates.includes(todayUTC())) {
-        setSelectedDate(dates[0]);
+      const dateStrs = dates.map((d) => d.date);
+      if (dates.length > 0 && !dateStrs.includes(todayUTC())) {
+        setSelectedDate(dateStrs[0]);
       } else {
         setSelectedDate(todayUTC());
       }
@@ -79,7 +78,11 @@ export function AppLayout() {
       }
       setEventDates((prev) => {
         const d = event.timestamp.slice(0, 10);
-        return prev.includes(d) ? prev : [d, ...prev];
+        const existing = prev.find((e) => e.date === d);
+        if (existing) {
+          return prev.map((e) => (e.date === d ? { ...e, count: e.count + 1 } : e));
+        }
+        return [{ date: d, count: 1 }, ...prev];
       });
     },
     [selectedDate],
@@ -129,17 +132,9 @@ export function AppLayout() {
     return events.filter((e) => {
       const cat = e.prompt ? 'user' : resolveCategory(e.action, e.type);
       if (cat && !activeCategories.has(cat)) return false;
-      if (search) {
-        const s = search.toLowerCase();
-        const searchable = [e.file, e.message, e.rule_id, e.type, e.action, e.step, e.task_id]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase();
-        if (!searchable.includes(s)) return false;
-      }
       return true;
     });
-  }, [events, activeCategories, search, resolveCategory]);
+  }, [events, activeCategories, resolveCategory]);
 
   return (
     <div className="flex-1 flex min-w-0 min-h-0">
@@ -159,8 +154,6 @@ export function AppLayout() {
               eventDates={eventDates}
               activeCategories={activeCategories}
               onToggleCategory={toggleCategory}
-              search={search}
-              onSearchChange={setSearch}
               onSelectEvent={handleSelectEvent}
               resolveAction={resolveAction}
               selectedEventId={drawerEvent?.id ?? null}

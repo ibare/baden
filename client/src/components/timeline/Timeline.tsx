@@ -20,11 +20,9 @@ export function Timeline({
   rawEvents,
   selectedDate,
   onDateChange,
-  eventDates: _eventDates,
+  eventDates,
   activeCategories,
   onToggleCategory: _onToggleCategory,
-  search,
-  onSearchChange,
   onSelectEvent,
   resolveAction,
   selectedEventId,
@@ -181,8 +179,7 @@ export function Timeline({
         selectedDate={selectedDate}
         onDateChange={onDateChange}
         isToday={isToday}
-        search={search}
-        onSearchChange={onSearchChange}
+        eventDates={eventDates}
         events={rawEvents}
         panelOpen={showPanel}
         onTogglePanel={togglePanel}

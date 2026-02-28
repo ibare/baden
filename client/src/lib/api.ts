@@ -96,7 +96,7 @@ export const api = {
   },
 
   getEventDates: (projectId: string) =>
-    request<string[]>(`/events/dates?projectId=${projectId}`),
+    request<{ date: string; count: number }[]>(`/events/dates?projectId=${projectId}`),
 
   createProject: (data: { name: string; description?: string; rulesPath: string }) =>
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(data) }),

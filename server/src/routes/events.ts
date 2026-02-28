@@ -33,9 +33,9 @@ eventsRouter.get('/dates', (req, res) => {
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const sql = `SELECT DISTINCT date(timestamp) as date FROM events ${where} ORDER BY date DESC`;
-  const rows = db.prepare(sql).all(...params) as { date: string }[];
-  res.json(rows.map((r) => r.date));
+  const sql = `SELECT date(timestamp) as date, COUNT(*) as count FROM events ${where} GROUP BY date(timestamp) ORDER BY date DESC`;
+  const rows = db.prepare(sql).all(...params) as { date: string; count: number }[];
+  res.json(rows);
 });
 
 // GET /api/events - 이벤트 조회

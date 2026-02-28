@@ -87,11 +87,9 @@ export interface TimelineProps {
   rawEvents: RuleEvent[];
   selectedDate: string;
   onDateChange: (date: string) => void;
-  eventDates: string[];
+  eventDates: { date: string; count: number }[];
   activeCategories: Set<EventCategory>;
   onToggleCategory: (cat: EventCategory) => void;
-  search: string;
-  onSearchChange: (s: string) => void;
   onSelectEvent: (event: RuleEvent) => void;
   resolveAction?: (action: string | null, type: string) => ResolvedAction;
   selectedEventId?: string | null;
