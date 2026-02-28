@@ -242,6 +242,7 @@ export function Timeline({
               placed={placed}
               lanes={lanes}
               segments={timeMap.segments}
+              ticks={ticks}
               totalWidth={totalWidth}
               totalHeight={totalHeight}
               viewportWidth={viewportWidth}

@@ -1,11 +1,12 @@
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import type { LaneInfo, PlacedItem, TimeSegment } from './lib/types';
+import type { LaneInfo, PlacedItem, Tick, TimeSegment } from './lib/types';
 import { CATEGORY_COLORS } from './lib/colors';
 
 interface TimelineMinimapProps {
   placed: PlacedItem[];
   lanes: LaneInfo[];
   segments: TimeSegment[];
+  ticks: Tick[];
   totalWidth: number;
   totalHeight: number;
   viewportWidth: number;
@@ -23,6 +24,7 @@ export const TimelineMinimap = memo(function TimelineMinimap({
   placed,
   lanes,
   segments,
+  ticks,
   totalWidth,
   totalHeight,
   viewportWidth,
@@ -132,6 +134,26 @@ export const TimelineMinimap = memo(function TimelineMinimap({
     return cells;
   }, [placed, lanes, totalWidth, totalHeight]);
 
+  // Filter ticks for minimap: major time ticks only, with minimum spacing
+  const minimapTicks = useMemo(() => {
+    const EDGE_MARGIN = 20;
+    const MIN_GAP = 45;
+
+    const majorTicks = ticks
+      .filter((t) => t.isMajor && !t.segmentType)
+      .map((t) => ({ x: t.x * scaleX, label: t.label }))
+      .filter((t) => t.x >= EDGE_MARGIN && t.x <= MINIMAP_WIDTH - EDGE_MARGIN);
+
+    // Remove ticks that are too close (left-to-right sweep)
+    const result: { x: number; label: string }[] = [];
+    for (const t of majorTicks) {
+      if (result.length === 0 || t.x - result[result.length - 1].x >= MIN_GAP) {
+        result.push(t);
+      }
+    }
+    return result;
+  }, [ticks, scaleX]);
+
   if (placed.length === 0) return null;
 
   const gapSegments = segments.filter((s) => s.type === 'gap');
@@ -208,6 +230,16 @@ export const TimelineMinimap = memo(function TimelineMinimap({
             height={MINIMAP_HEIGHT}
             fill="url(#minimap-event-gap-dots)"
           />
+        ))}
+
+        {/* Time ticks */}
+        {minimapTicks.map((t) => (
+          <g key={t.x}>
+            <line x1={t.x} y1={0} x2={t.x} y2={2} stroke="currentColor" strokeOpacity={0.3} />
+            <text x={t.x} y={10} fontSize={9} fill="currentColor" fillOpacity={0.5} textAnchor="middle">
+              {t.label}
+            </text>
+          </g>
         ))}
 
         {/* Density heatmap cells */}
