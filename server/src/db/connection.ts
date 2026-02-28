@@ -165,55 +165,55 @@ if (!hasActionPrefixes) {
     console.log('[DB] Seeding action_prefixes from wildcard patterns...');
     const seedData: { prefix: string; category: string; label: string; icon: string | null }[] = [
       // exploration
-      { prefix: 'read', category: 'exploration', label: '읽기', icon: 'BookOpen' },
-      { prefix: 'search', category: 'exploration', label: '검색', icon: 'MagnifyingGlass' },
-      { prefix: 'find', category: 'exploration', label: '찾기', icon: 'MagnifyingGlass' },
-      { prefix: 'check', category: 'exploration', label: '확인', icon: 'Eye' },
-      { prefix: 'list', category: 'exploration', label: '목록', icon: 'List' },
-      { prefix: 'get', category: 'exploration', label: '조회', icon: 'Eye' },
-      { prefix: 'view', category: 'exploration', label: '보기', icon: 'Eye' },
+      { prefix: 'read', category: 'exploration', label: 'Read', icon: 'BookOpen' },
+      { prefix: 'search', category: 'exploration', label: 'Search', icon: 'MagnifyingGlass' },
+      { prefix: 'find', category: 'exploration', label: 'Find', icon: 'MagnifyingGlass' },
+      { prefix: 'check', category: 'exploration', label: 'Check', icon: 'Eye' },
+      { prefix: 'list', category: 'exploration', label: 'List', icon: 'List' },
+      { prefix: 'get', category: 'exploration', label: 'Get', icon: 'Eye' },
+      { prefix: 'view', category: 'exploration', label: 'View', icon: 'Eye' },
       // planning
-      { prefix: 'plan', category: 'planning', label: '계획', icon: 'MapTrifold' },
-      { prefix: 'analyze', category: 'planning', label: '분석', icon: 'ChartLine' },
-      { prefix: 'analysis', category: 'planning', label: '분석', icon: 'ChartLine' },
-      { prefix: 'decide', category: 'planning', label: '결정', icon: 'GitBranch' },
-      { prefix: 'design', category: 'planning', label: '설계', icon: 'PencilRuler' },
-      { prefix: 'evaluate', category: 'planning', label: '평가', icon: 'Scales' },
+      { prefix: 'plan', category: 'planning', label: 'Plan', icon: 'MapTrifold' },
+      { prefix: 'analyze', category: 'planning', label: 'Analyze', icon: 'ChartLine' },
+      { prefix: 'analysis', category: 'planning', label: 'Analysis', icon: 'ChartLine' },
+      { prefix: 'decide', category: 'planning', label: 'Decide', icon: 'GitBranch' },
+      { prefix: 'design', category: 'planning', label: 'Design', icon: 'PencilRuler' },
+      { prefix: 'evaluate', category: 'planning', label: 'Evaluate', icon: 'Scales' },
       // implementation
-      { prefix: 'add', category: 'implementation', label: '추가', icon: 'Plus' },
-      { prefix: 'create', category: 'implementation', label: '생성', icon: 'FilePlus' },
-      { prefix: 'update', category: 'implementation', label: '수정', icon: 'PencilSimple' },
-      { prefix: 'modify', category: 'implementation', label: '변경', icon: 'PencilSimple' },
-      { prefix: 'remove', category: 'implementation', label: '제거', icon: 'Minus' },
-      { prefix: 'delete', category: 'implementation', label: '삭제', icon: 'Trash' },
-      { prefix: 'refactor', category: 'implementation', label: '리팩터', icon: 'ArrowsClockwise' },
-      { prefix: 'implement', category: 'implementation', label: '구현', icon: 'Code' },
-      { prefix: 'write', category: 'implementation', label: '작성', icon: 'PencilLine' },
-      { prefix: 'configure', category: 'implementation', label: '설정', icon: 'Gear' },
-      { prefix: 'set', category: 'implementation', label: '설정', icon: 'Gear' },
-      { prefix: 'install', category: 'implementation', label: '설치', icon: 'Download' },
-      { prefix: 'move', category: 'implementation', label: '이동', icon: 'ArrowRight' },
-      { prefix: 'rename', category: 'implementation', label: '이름변경', icon: 'TextAa' },
-      // rule_compliance (verification/debugging 흡수)
-      { prefix: 'test', category: 'rule_compliance', label: '테스트', icon: 'Flask' },
-      { prefix: 'verify', category: 'rule_compliance', label: '검증', icon: 'CheckCircle' },
-      { prefix: 'validate', category: 'rule_compliance', label: '유효성', icon: 'ShieldCheck' },
-      { prefix: 'run', category: 'rule_compliance', label: '실행', icon: 'Play' },
-      { prefix: 'build', category: 'rule_compliance', label: '빌드', icon: 'Hammer' },
-      { prefix: 'fix', category: 'implementation', label: '수정', icon: 'Wrench' },
-      { prefix: 'debug', category: 'implementation', label: '디버그', icon: 'Bug' },
-      { prefix: 'resolve', category: 'implementation', label: '해결', icon: 'CheckCircle' },
+      { prefix: 'add', category: 'implementation', label: 'Add', icon: 'Plus' },
+      { prefix: 'create', category: 'implementation', label: 'Create', icon: 'FilePlus' },
+      { prefix: 'update', category: 'implementation', label: 'Update', icon: 'PencilSimple' },
+      { prefix: 'modify', category: 'implementation', label: 'Modify', icon: 'PencilSimple' },
+      { prefix: 'remove', category: 'implementation', label: 'Remove', icon: 'Minus' },
+      { prefix: 'delete', category: 'implementation', label: 'Delete', icon: 'Trash' },
+      { prefix: 'refactor', category: 'implementation', label: 'Refactor', icon: 'ArrowsClockwise' },
+      { prefix: 'implement', category: 'implementation', label: 'Implement', icon: 'Code' },
+      { prefix: 'write', category: 'implementation', label: 'Write', icon: 'PencilLine' },
+      { prefix: 'configure', category: 'implementation', label: 'Configure', icon: 'Gear' },
+      { prefix: 'set', category: 'implementation', label: 'Set', icon: 'Gear' },
+      { prefix: 'install', category: 'implementation', label: 'Install', icon: 'Download' },
+      { prefix: 'move', category: 'implementation', label: 'Move', icon: 'ArrowRight' },
+      { prefix: 'rename', category: 'implementation', label: 'Rename', icon: 'TextAa' },
+      // rule_compliance (verification/debugging absorbed)
+      { prefix: 'test', category: 'rule_compliance', label: 'Test', icon: 'Flask' },
+      { prefix: 'verify', category: 'rule_compliance', label: 'Verify', icon: 'CheckCircle' },
+      { prefix: 'validate', category: 'rule_compliance', label: 'Validate', icon: 'ShieldCheck' },
+      { prefix: 'run', category: 'rule_compliance', label: 'Run', icon: 'Play' },
+      { prefix: 'build', category: 'rule_compliance', label: 'Build', icon: 'Hammer' },
+      { prefix: 'fix', category: 'implementation', label: 'Fix', icon: 'Wrench' },
+      { prefix: 'debug', category: 'implementation', label: 'Debug', icon: 'Bug' },
+      { prefix: 'resolve', category: 'implementation', label: 'Resolve', icon: 'CheckCircle' },
       // rule_compliance
-      { prefix: 'apply', category: 'rule_compliance', label: '적용', icon: 'Check' },
-      { prefix: 'enforce', category: 'rule_compliance', label: '강제', icon: 'Shield' },
+      { prefix: 'apply', category: 'rule_compliance', label: 'Apply', icon: 'Check' },
+      { prefix: 'enforce', category: 'rule_compliance', label: 'Enforce', icon: 'Shield' },
       // misc
-      { prefix: 'review', category: 'planning', label: '검토', icon: 'MagnifyingGlassPlus' },
-      { prefix: 'report', category: 'planning', label: '보고', icon: 'FileText' },
-      { prefix: 'deliver', category: 'implementation', label: '전달', icon: 'PaperPlaneRight' },
-      { prefix: 'completed', category: 'rule_compliance', label: '완료', icon: 'CheckCircle' },
-      { prefix: 'task', category: 'planning', label: '작업', icon: 'ClipboardText' },
-      { prefix: 'invoke', category: 'implementation', label: '호출', icon: 'Lightning' },
-      { prefix: 'invoke_rule', category: 'rule_compliance', label: '규칙호출', icon: 'BookBookmark' },
+      { prefix: 'review', category: 'planning', label: 'Review', icon: 'MagnifyingGlassPlus' },
+      { prefix: 'report', category: 'planning', label: 'Report', icon: 'FileText' },
+      { prefix: 'deliver', category: 'implementation', label: 'Deliver', icon: 'PaperPlaneRight' },
+      { prefix: 'completed', category: 'rule_compliance', label: 'Completed', icon: 'CheckCircle' },
+      { prefix: 'task', category: 'planning', label: 'Task', icon: 'ClipboardText' },
+      { prefix: 'invoke', category: 'implementation', label: 'Invoke', icon: 'Lightning' },
+      { prefix: 'invoke_rule', category: 'rule_compliance', label: 'Invoke Rule', icon: 'BookBookmark' },
     ];
     const insertPrefix = db.prepare(`
       INSERT OR IGNORE INTO action_prefixes (project_id, prefix, category, label, icon, sort_order)
@@ -347,6 +347,38 @@ if (queryEventCount.cnt > 0) {
   });
   tx();
   console.log('[DB] Migration complete: query events reclassified');
+}
+
+// Migration: localize Korean labels to English in action_prefixes
+const hasKoreanLabels = db.prepare(
+  "SELECT COUNT(*) as cnt FROM action_prefixes WHERE label = '읽기'"
+).get() as { cnt: number };
+if (hasKoreanLabels.cnt > 0) {
+  console.log('[DB] Migrating: localizing action_prefixes labels to English...');
+  const labelMap: [string, string][] = [
+    ['읽기', 'Read'], ['검색', 'Search'], ['찾기', 'Find'], ['확인', 'Check'],
+    ['목록', 'List'], ['조회', 'Get'], ['보기', 'View'],
+    ['계획', 'Plan'], ['분석', 'Analyze'], ['결정', 'Decide'],
+    ['설계', 'Design'], ['평가', 'Evaluate'],
+    ['추가', 'Add'], ['생성', 'Create'], ['수정', 'Fix'], ['변경', 'Modify'],
+    ['제거', 'Remove'], ['삭제', 'Delete'], ['리팩터', 'Refactor'],
+    ['구현', 'Implement'], ['작성', 'Write'], ['설정', 'Configure'],
+    ['설치', 'Install'], ['이동', 'Move'], ['이름변경', 'Rename'],
+    ['테스트', 'Test'], ['검증', 'Verify'], ['유효성', 'Validate'],
+    ['실행', 'Run'], ['빌드', 'Build'], ['디버그', 'Debug'], ['해결', 'Resolve'],
+    ['적용', 'Apply'], ['강제', 'Enforce'],
+    ['검토', 'Review'], ['보고', 'Report'], ['전달', 'Deliver'],
+    ['완료', 'Completed'], ['작업', 'Task'], ['호출', 'Invoke'],
+    ['규칙호출', 'Invoke Rule'],
+  ];
+  const updateLabel = db.prepare('UPDATE action_prefixes SET label = ? WHERE label = ?');
+  const tx = db.transaction(() => {
+    for (const [ko, en] of labelMap) {
+      updateLabel.run(en, ko);
+    }
+  });
+  tx();
+  console.log('[DB] Migration complete: labels localized to English');
 }
 
 db.pragma('foreign_keys = ON');
