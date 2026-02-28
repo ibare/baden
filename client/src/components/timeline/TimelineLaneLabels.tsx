@@ -25,7 +25,7 @@ export const TimelineLaneLabels = memo(
             return (
               <div
                 key={lane.category}
-                className="absolute left-0 right-0 flex items-center px-1 text-xs font-medium truncate"
+                className="absolute left-0 right-0 flex items-center justify-center px-1 text-xs font-medium truncate border-t border-border"
                 style={{
                   top: lane.y,
                   height: lane.height,

@@ -103,6 +103,20 @@ export const TimelineGrid = memo(function TimelineGrid({
         />
       ))}
 
+      {/* Lane separator lines */}
+      {lanes.map((lane) => (
+        <line
+          key={`sep-${lane.category}`}
+          x1={0}
+          y1={lane.y}
+          x2="100%"
+          y2={lane.y}
+          stroke="currentColor"
+          strokeOpacity={0.12}
+          strokeWidth={1}
+        />
+      ))}
+
       {/* Gap overlays: solid tint + hatching */}
       {gapSegments.map((seg) => (
         <g key={`gap-${seg.startMs}`}>

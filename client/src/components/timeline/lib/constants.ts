@@ -1,13 +1,13 @@
 import type { EventCategory } from '@/lib/event-types';
 
 // Layout dimensions
-export const LABEL_WIDTH = 72;
+export const LABEL_WIDTH = 140;
 export const TIME_AXIS_HEIGHT = 28;
 export const SUB_ROW_HEIGHT = 28;
 export const BAR_HEIGHT = 22;
 export type ExpandLevel = 0 | 1 | 2;
 export const DETAIL_HEIGHTS = [0, 22, 44] as const;
-export const LANE_GAP = 6;
+export const LANE_GAP = 0;
 export const LANE_PAD_TOP = 30;
 export const LANE_PAD_BOTTOM = 30;
 export const MARKER_SIZE = 10;
