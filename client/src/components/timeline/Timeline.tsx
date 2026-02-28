@@ -240,6 +240,7 @@ export function Timeline({
             </div>
             <TimelineMinimap
               placed={placed}
+              lanes={lanes}
               segments={timeMap.segments}
               totalWidth={totalWidth}
               totalHeight={totalHeight}

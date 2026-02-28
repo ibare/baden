@@ -1,10 +1,10 @@
-import { memo, useCallback, useRef, useState } from 'react';
-import type { PlacedItem, TimeSegment } from './lib/types';
-import { BAR_HEIGHT } from './lib/constants';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import type { LaneInfo, PlacedItem, TimeSegment } from './lib/types';
 import { CATEGORY_COLORS } from './lib/colors';
 
 interface TimelineMinimapProps {
   placed: PlacedItem[];
+  lanes: LaneInfo[];
   segments: TimeSegment[];
   totalWidth: number;
   totalHeight: number;
@@ -15,11 +15,13 @@ interface TimelineMinimapProps {
   onNavigate: (scrollLeft: number, scrollTop: number) => void;
 }
 
-const MINIMAP_WIDTH = 200;
-const MINIMAP_HEIGHT = 48;
+const MINIMAP_WIDTH = 300;
+const MINIMAP_HEIGHT = 112;
+const BIN_WIDTH_PX = 4;
 
 export const TimelineMinimap = memo(function TimelineMinimap({
   placed,
+  lanes,
   segments,
   totalWidth,
   totalHeight,
@@ -78,6 +80,58 @@ export const TimelineMinimap = memo(function TimelineMinimap({
     setIsDragging(false);
   }, []);
 
+  // Build density heatmap grid: X bins × lanes
+  const heatmapCells = useMemo(() => {
+    if (placed.length === 0 || lanes.length === 0) return [];
+
+    const numBins = Math.max(1, Math.floor(MINIMAP_WIDTH / BIN_WIDTH_PX));
+    const binScale = numBins / totalWidth; // items px → bin index
+
+    // Count events per (bin, lane)
+    const grid: number[][] = lanes.map(() => new Array(numBins).fill(0));
+    for (const item of placed) {
+      const bin = Math.min(Math.floor(item.x * binScale), numBins - 1);
+      if (bin >= 0 && item.lane >= 0 && item.lane < lanes.length) {
+        grid[item.lane][bin]++;
+      }
+    }
+
+    // Find global max for normalization
+    let maxCount = 0;
+    for (const row of grid) {
+      for (const c of row) {
+        if (c > maxCount) maxCount = c;
+      }
+    }
+    if (maxCount === 0) return [];
+
+    // Build cell descriptors
+    const cells: { x: number; y: number; w: number; h: number; color: string; opacity: number }[] = [];
+    const sy = MINIMAP_HEIGHT / totalHeight;
+
+    for (let li = 0; li < lanes.length; li++) {
+      const lane = lanes[li];
+      const color = CATEGORY_COLORS[lane.category]?.fill ?? '#888';
+      const cellY = lane.y * sy;
+      const cellH = lane.height * sy;
+
+      for (let bi = 0; bi < numBins; bi++) {
+        const count = grid[li][bi];
+        if (count === 0) continue;
+        const ratio = count / maxCount;
+        cells.push({
+          x: bi * BIN_WIDTH_PX,
+          y: cellY,
+          w: BIN_WIDTH_PX,
+          h: cellH,
+          color,
+          opacity: 0.1 + ratio * 0.7, // 0.1 ~ 0.8
+        });
+      }
+    }
+    return cells;
+  }, [placed, lanes, totalWidth, totalHeight]);
+
   if (placed.length === 0) return null;
 
   const gapSegments = segments.filter((s) => s.type === 'gap');
@@ -93,7 +147,7 @@ export const TimelineMinimap = memo(function TimelineMinimap({
         height: MINIMAP_HEIGHT,
         zIndex: 10,
       }}
-      className="rounded border border-border/60 shadow-md bg-background/80 backdrop-blur-sm"
+      className="rounded border border-border shadow-lg bg-background/90 backdrop-blur-sm"
     >
       <svg
         ref={svgRef}
@@ -156,17 +210,16 @@ export const TimelineMinimap = memo(function TimelineMinimap({
           />
         ))}
 
-        {/* Event items as colored rects */}
-        {placed.map((item) => (
+        {/* Density heatmap cells */}
+        {heatmapCells.map((cell, i) => (
           <rect
-            key={item.id}
-            x={item.x * scaleX}
-            y={item.y * scaleY}
-            width={Math.max(1, item.width * scaleX)}
-            height={Math.max(1, BAR_HEIGHT * scaleY)}
-            fill={CATEGORY_COLORS[item.category]?.fill ?? '#888'}
-            fillOpacity={0.7}
-            rx={0.5}
+            key={i}
+            x={cell.x}
+            y={cell.y}
+            width={cell.w}
+            height={cell.h}
+            fill={cell.color}
+            fillOpacity={cell.opacity}
           />
         ))}
 
