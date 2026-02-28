@@ -12,14 +12,10 @@ export type EventType =
   | 'code_modify'
   | 'refactor'
   | 'file_write'
-  // verification
+  // rule_compliance
   | 'test_run'
   | 'build_run'
   | 'lint_run'
-  // debugging
-  | 'error_encountered'
-  | 'error_resolved'
-  // rule_compliance
   | 'rule_match'
   | 'violation_found'
   | 'fix_applied'
@@ -32,8 +28,6 @@ export type EventCategory =
   | 'exploration'
   | 'planning'
   | 'implementation'
-  | 'verification'
-  | 'debugging'
   | 'rule_compliance';
 
 export const EVENT_CATEGORY_MAP: Record<EventType, EventCategory> = {
@@ -47,11 +41,9 @@ export const EVENT_CATEGORY_MAP: Record<EventType, EventCategory> = {
   code_modify: 'implementation',
   refactor: 'implementation',
   file_write: 'implementation',
-  test_run: 'verification',
-  build_run: 'verification',
-  lint_run: 'verification',
-  error_encountered: 'debugging',
-  error_resolved: 'debugging',
+  test_run: 'rule_compliance',
+  build_run: 'rule_compliance',
+  lint_run: 'rule_compliance',
   rule_match: 'rule_compliance',
   violation_found: 'rule_compliance',
   fix_applied: 'rule_compliance',

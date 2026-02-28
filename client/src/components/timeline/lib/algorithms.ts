@@ -98,8 +98,6 @@ export function computeLanes(
     exploration: 'Exploration',
     planning: 'Planning',
     implementation: 'Implementation',
-    verification: 'Verification',
-    debugging: 'Debugging',
     rule_compliance: 'Rules',
   };
 

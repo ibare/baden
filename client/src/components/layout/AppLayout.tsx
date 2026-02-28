@@ -28,7 +28,7 @@ export function AppLayout() {
   // Timeline filters
   const [selectedDate, setSelectedDate] = useState(todayUTC);
   const [activeCategories, setActiveCategories] = useState<Set<EventCategory>>(
-    new Set(['user', 'exploration', 'planning', 'implementation', 'verification', 'debugging', 'rule_compliance']),
+    new Set(['user', 'exploration', 'planning', 'implementation', 'rule_compliance']),
   );
   const [search, setSearch] = useState('');
 

@@ -7,8 +7,6 @@ const CATEGORIES: EventCategory[] = [
   'exploration',
   'planning',
   'implementation',
-  'verification',
-  'debugging',
   'rule_compliance',
 ];
 

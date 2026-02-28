@@ -52,26 +52,6 @@ export const CATEGORY_COLORS: Record<EventCategory, CategoryColors> = {
     detailBg: '#c2410c',
     detailText: '#fff7ed',
   },
-  verification: {
-    fill: '#facc15',
-    fillHover: '#eab308',
-    stroke: '#ca8a04',
-    text: '#a16207',
-    bg: 'rgba(250,204,21,0.08)',
-    connector: '#facc15',
-    detailBg: '#a16207',
-    detailText: '#fefce8',
-  },
-  debugging: {
-    fill: '#fbbf24',
-    fillHover: '#f59e0b',
-    stroke: '#d97706',
-    text: '#b45309',
-    bg: 'rgba(251,191,36,0.08)',
-    connector: '#fbbf24',
-    detailBg: '#92400e',
-    detailText: '#fffbeb',
-  },
   rule_compliance: {
     fill: '#fb7185',
     fillHover: '#f43f5e',
@@ -97,11 +77,5 @@ export const CATEGORY_BUTTON_CLASSES: Record<
     hover: 'hover:bg-orange-400/90',
     text: 'text-orange-700',
   },
-  verification: {
-    bg: 'bg-yellow-400/70',
-    hover: 'hover:bg-yellow-400/90',
-    text: 'text-yellow-700',
-  },
-  debugging: { bg: 'bg-amber-400/70', hover: 'hover:bg-amber-400/90', text: 'text-amber-700' },
   rule_compliance: { bg: 'bg-rose-400/70', hover: 'hover:bg-rose-400/90', text: 'text-rose-700' },
 };

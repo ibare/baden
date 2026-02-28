@@ -47,7 +47,5 @@ export const CATEGORY_ORDER: EventCategory[] = [
   'exploration',
   'planning',
   'implementation',
-  'verification',
-  'debugging',
   'rule_compliance',
 ];

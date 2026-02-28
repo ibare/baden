@@ -15,8 +15,6 @@ import {
   Flask,
   Hammer,
   MagicWand,
-  Bug,
-  Check,
   Shield,
   ShieldWarning,
   ShieldCheck,
@@ -41,14 +39,10 @@ export const EVENT_TYPE_ICONS: Record<string, Icon> = {
   code_modify: PencilSimple,
   refactor: ArrowsClockwise,
   file_write: FloppyDisk,
-  // verification
+  // rule_compliance
   test_run: Flask,
   build_run: Hammer,
   lint_run: MagicWand,
-  // debugging
-  error_encountered: Bug,
-  error_resolved: Check,
-  // rule_compliance
   rule_match: Shield,
   violation_found: ShieldWarning,
   fix_applied: ShieldCheck,

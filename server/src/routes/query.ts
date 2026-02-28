@@ -5,57 +5,80 @@ import type { QueryInput, EventInput, EventType, Severity } from '../types.js';
 export const queryRouter = Router();
 
 /**
- * 자유 서술 action 텍스트를 이벤트 타입으로 추론한다.
- * 키워드 매칭 — 먼저 매칭되는 규칙이 우선.
+ * 단어 → EventType 사전.
+ * action을 _로 split 후 앞에서부터 순회, 첫 매칭 단어의 EventType을 반환.
  */
-const ACTION_PATTERNS: [RegExp, EventType][] = [
-  // rule compliance
-  [/\bviolation|위반.*발견/i, 'violation_found'],
-  [/\bfix.?appli|위반.*수정|위반.*fix/i, 'fix_applied'],
-  [/\brule.?match|규칙.*참조|규칙.*준수/i, 'rule_match'],
-  // debugging
-  [/\berror.?encounter|오류.*발생|exception|crash|fail(?!ed\s*0)/i, 'error_encountered'],
-  [/\berror.?resolv|오류.*해결|오류.*수정|bug.?fix/i, 'error_resolved'],
-  // verification
-  [/\btest|테스트/i, 'test_run'],
-  [/\bbuild|빌드|tsc|compil/i, 'build_run'],
-  [/\blint|format|prettier|eslint/i, 'lint_run'],
-  // exploration
-  [/\bsearch|grep|find.*symbol|검색|찾/i, 'code_search'],
-  [/\bread.*(?:doc|readme|api)|문서.*(?:읽|참조|확인)/i, 'doc_read'],
-  [/\bdependenc|package\.json|requirements|의존/i, 'dependency_check'],
-  [/\bread|읽/i, 'file_read'],
+const WORD_TO_TYPE: Record<string, EventType> = {
+  // rule_compliance
+  rule: 'rule_match',
+  violation: 'rule_match',
+  check: 'rule_match',
+  verify: 'build_run',
+  test: 'build_run',
+  build: 'build_run',
+  typecheck: 'build_run',
+  lint: 'build_run',
+  validate: 'build_run',
   // planning
-  [/\btask.?complete|작업.*완료|작업.*마침/i, 'task_complete'],
-  [/\banalyz|분석|요구사항|task.*break/i, 'task_analysis'],
-  [/\bdecid|결정|approach|방식.*선택/i, 'approach_decision'],
+  plan: 'task_analysis',
+  analyze: 'task_analysis',
+  review: 'task_analysis',
+  decide: 'task_analysis',
+  receive: 'task_analysis',
+  task: 'task_analysis',
+  compile: 'task_analysis',
+  synthesize: 'task_analysis',
+  finalize: 'task_analysis',
+  confirm: 'task_analysis',
+  report: 'task_analysis',
+  adjust: 'task_analysis',
+  // exploration
+  read: 'file_read',
+  search: 'file_read',
+  scan: 'file_read',
+  find: 'file_read',
+  trace: 'file_read',
+  list: 'file_read',
+  identify: 'file_read',
+  understand: 'file_read',
   // implementation
-  [/\bcreate|생성|새.*파일|new.*file|adding.*file/i, 'code_create'],
-  [/\brefactor|리팩/i, 'refactor'],
-  [/\bconfig|설정.*파일|\.json|\.yaml|\.env/i, 'file_write'],
-  [/\bmodif|edit|updat|chang|수정|변경|추가|삭제|remov|delet|writ/i, 'code_modify'],
-];
+  create: 'code_create',
+  modify: 'code_modify',
+  edit: 'code_modify',
+  delete: 'code_modify',
+  rewrite: 'code_modify',
+  add: 'code_modify',
+  implement: 'code_modify',
+  update: 'code_modify',
+  write: 'code_modify',
+  fix: 'code_modify',
+  harden: 'code_modify',
+  protect: 'code_modify',
+  apply: 'code_modify',
+  start: 'code_modify',
+  continue: 'code_modify',
+  skip: 'code_modify',
+};
 
-function inferEventType(action: string, phase?: string): EventType {
-  // 정확히 알려진 이벤트 타입이면 그대로 사용
-  for (const [, type] of ACTION_PATTERNS) {
-    if (action === type) return type;
+/** run은 skip word — 다음 단어로 위임 */
+const SKIP_WORDS = new Set(['run']);
+
+function inferEventType(action: string, _phase?: string, ruleId?: string): EventType {
+  // 정확히 알려진 EventType이면 그대로 사용
+  if (action in WORD_TO_TYPE && !action.includes('_')) {
+    return WORD_TO_TYPE[action];
   }
 
-  // 키워드 패턴 매칭
-  for (const [pattern, type] of ACTION_PATTERNS) {
-    if (pattern.test(action)) return type;
+  // _로 분해 후 앞에서부터 순회
+  const words = action.toLowerCase().split('_');
+  for (const word of words) {
+    if (SKIP_WORDS.has(word)) continue;
+    const type = WORD_TO_TYPE[word];
+    if (type) return type;
   }
 
-  // phase로 fallback 추론
-  if (phase) {
-    const p = phase.toLowerCase();
-    if (/explor|탐색/.test(p)) return 'file_read';
-    if (/plan|계획|분석/.test(p)) return 'task_analysis';
-    if (/implement|구현/.test(p)) return 'code_modify';
-    if (/verif|검증|test/.test(p)) return 'test_run';
-    if (/debug|디버/.test(p)) return 'error_encountered';
-  }
+  // 매칭 없으면: rule_id 존재 시 → rule_match
+  if (ruleId) return 'rule_match';
 
   return 'query';
 }
@@ -70,7 +93,7 @@ queryRouter.post('/', (req, res) => {
       return;
     }
 
-    const eventType = inferEventType(q.action, q.phase);
+    const eventType = inferEventType(q.action, q.phase, q.ruleId);
     console.log(`[Query] action="${q.action}" → type=${eventType}`);
 
     const input: EventInput = {

@@ -194,24 +194,23 @@ if (!hasActionPrefixes) {
       { prefix: 'install', category: 'implementation', label: '설치', icon: 'Download' },
       { prefix: 'move', category: 'implementation', label: '이동', icon: 'ArrowRight' },
       { prefix: 'rename', category: 'implementation', label: '이름변경', icon: 'TextAa' },
-      // verification
-      { prefix: 'test', category: 'verification', label: '테스트', icon: 'Flask' },
-      { prefix: 'verify', category: 'verification', label: '검증', icon: 'CheckCircle' },
-      { prefix: 'validate', category: 'verification', label: '유효성', icon: 'ShieldCheck' },
-      { prefix: 'run', category: 'verification', label: '실행', icon: 'Play' },
-      { prefix: 'build', category: 'verification', label: '빌드', icon: 'Hammer' },
-      // debugging
-      { prefix: 'fix', category: 'debugging', label: '수정', icon: 'Wrench' },
-      { prefix: 'debug', category: 'debugging', label: '디버그', icon: 'Bug' },
-      { prefix: 'resolve', category: 'debugging', label: '해결', icon: 'CheckCircle' },
+      // rule_compliance (verification/debugging 흡수)
+      { prefix: 'test', category: 'rule_compliance', label: '테스트', icon: 'Flask' },
+      { prefix: 'verify', category: 'rule_compliance', label: '검증', icon: 'CheckCircle' },
+      { prefix: 'validate', category: 'rule_compliance', label: '유효성', icon: 'ShieldCheck' },
+      { prefix: 'run', category: 'rule_compliance', label: '실행', icon: 'Play' },
+      { prefix: 'build', category: 'rule_compliance', label: '빌드', icon: 'Hammer' },
+      { prefix: 'fix', category: 'implementation', label: '수정', icon: 'Wrench' },
+      { prefix: 'debug', category: 'implementation', label: '디버그', icon: 'Bug' },
+      { prefix: 'resolve', category: 'implementation', label: '해결', icon: 'CheckCircle' },
       // rule_compliance
       { prefix: 'apply', category: 'rule_compliance', label: '적용', icon: 'Check' },
       { prefix: 'enforce', category: 'rule_compliance', label: '강제', icon: 'Shield' },
       // misc
       { prefix: 'review', category: 'planning', label: '검토', icon: 'MagnifyingGlassPlus' },
-      { prefix: 'report', category: 'verification', label: '보고', icon: 'FileText' },
+      { prefix: 'report', category: 'planning', label: '보고', icon: 'FileText' },
       { prefix: 'deliver', category: 'implementation', label: '전달', icon: 'PaperPlaneRight' },
-      { prefix: 'completed', category: 'verification', label: '완료', icon: 'CheckCircle' },
+      { prefix: 'completed', category: 'rule_compliance', label: '완료', icon: 'CheckCircle' },
       { prefix: 'task', category: 'planning', label: '작업', icon: 'ClipboardText' },
       { prefix: 'invoke', category: 'implementation', label: '호출', icon: 'Lightning' },
       { prefix: 'invoke_rule', category: 'rule_compliance', label: '규칙호출', icon: 'BookBookmark' },
@@ -254,13 +253,13 @@ if (!hasDetailKeywords) {
   if (projectRows2.length > 0) {
     console.log('[DB] Seeding detail_keywords...');
     const keywordSeed: { keyword: string; category: string }[] = [
-      { keyword: 'test', category: 'verification' },
-      { keyword: 'tests', category: 'verification' },
-      { keyword: 'spec', category: 'verification' },
-      { keyword: 'lint', category: 'verification' },
-      { keyword: 'error', category: 'debugging' },
-      { keyword: 'bug', category: 'debugging' },
-      { keyword: 'debug', category: 'debugging' },
+      { keyword: 'test', category: 'rule_compliance' },
+      { keyword: 'tests', category: 'rule_compliance' },
+      { keyword: 'spec', category: 'rule_compliance' },
+      { keyword: 'lint', category: 'rule_compliance' },
+      { keyword: 'error', category: 'implementation' },
+      { keyword: 'bug', category: 'implementation' },
+      { keyword: 'debug', category: 'implementation' },
       { keyword: 'rule', category: 'rule_compliance' },
       { keyword: 'rules', category: 'rule_compliance' },
       { keyword: 'doc', category: 'exploration' },
@@ -284,6 +283,70 @@ if (!hasDetailKeywords) {
   }
 
   console.log('[DB] Migration complete: detail_keywords table created');
+}
+
+// Migration: collapse debugging/verification → implementation/rule_compliance
+const hasOldCategories = db.prepare(
+  "SELECT COUNT(*) as cnt FROM action_prefixes WHERE category IN ('debugging', 'verification')"
+).get() as { cnt: number };
+if (hasOldCategories.cnt > 0) {
+  console.log('[DB] Migrating: collapsing debugging/verification categories...');
+  db.exec(`
+    UPDATE action_prefixes SET category = 'implementation' WHERE category = 'debugging';
+    UPDATE action_prefixes SET category = 'rule_compliance' WHERE category = 'verification';
+    UPDATE detail_keywords SET category = 'implementation' WHERE category = 'debugging';
+    UPDATE detail_keywords SET category = 'rule_compliance' WHERE category = 'verification';
+    UPDATE events SET type = 'code_modify' WHERE type IN ('error_encountered', 'error_resolved');
+  `);
+  console.log('[DB] Migration complete: categories collapsed');
+}
+
+// Migration: reclassify events with type='query' using word decomposition algorithm
+const queryEventCount = db.prepare(
+  "SELECT COUNT(*) as cnt FROM events WHERE type = 'query' AND action IS NOT NULL"
+).get() as { cnt: number };
+if (queryEventCount.cnt > 0) {
+  console.log(`[DB] Migrating: reclassifying ${queryEventCount.cnt} query events...`);
+  const WORD_TO_TYPE: Record<string, string> = {
+    rule: 'rule_match', violation: 'rule_match', check: 'rule_match',
+    verify: 'build_run', test: 'build_run', build: 'build_run', typecheck: 'build_run', lint: 'build_run', validate: 'build_run',
+    plan: 'task_analysis', analyze: 'task_analysis', review: 'task_analysis', decide: 'task_analysis',
+    receive: 'task_analysis', task: 'task_analysis', compile: 'task_analysis', synthesize: 'task_analysis',
+    finalize: 'task_analysis', confirm: 'task_analysis', report: 'task_analysis', adjust: 'task_analysis',
+    read: 'file_read', search: 'file_read', scan: 'file_read', find: 'file_read',
+    trace: 'file_read', list: 'file_read', identify: 'file_read', understand: 'file_read',
+    create: 'code_create',
+    modify: 'code_modify', edit: 'code_modify', delete: 'code_modify', rewrite: 'code_modify',
+    add: 'code_modify', implement: 'code_modify', update: 'code_modify', write: 'code_modify',
+    fix: 'code_modify', harden: 'code_modify', protect: 'code_modify', apply: 'code_modify',
+    start: 'code_modify', continue: 'code_modify', skip: 'code_modify',
+  };
+  const SKIP_WORDS = new Set(['run']);
+
+  const rows = db.prepare(
+    "SELECT id, action, rule_id FROM events WHERE type = 'query' AND action IS NOT NULL"
+  ).all() as { id: string; action: string; rule_id: string | null }[];
+
+  const updateStmt = db.prepare('UPDATE events SET type = ? WHERE id = ?');
+  const tx = db.transaction(() => {
+    let reclassified = 0;
+    for (const row of rows) {
+      let newType: string | null = null;
+      const words = row.action.toLowerCase().split('_');
+      for (const word of words) {
+        if (SKIP_WORDS.has(word)) continue;
+        if (WORD_TO_TYPE[word]) { newType = WORD_TO_TYPE[word]; break; }
+      }
+      if (!newType && row.rule_id) newType = 'rule_match';
+      if (newType) {
+        updateStmt.run(newType, row.id);
+        reclassified++;
+      }
+    }
+    console.log(`[DB] Reclassified ${reclassified}/${rows.length} events`);
+  });
+  tx();
+  console.log('[DB] Migration complete: query events reclassified');
 }
 
 db.pragma('foreign_keys = ON');

@@ -3,8 +3,6 @@ export type EventCategory =
   | 'exploration'
   | 'planning'
   | 'implementation'
-  | 'verification'
-  | 'debugging'
   | 'rule_compliance';
 
 export const EVENT_CATEGORY_MAP: Record<string, EventCategory> = {
@@ -18,11 +16,9 @@ export const EVENT_CATEGORY_MAP: Record<string, EventCategory> = {
   code_modify: 'implementation',
   refactor: 'implementation',
   file_write: 'implementation',
-  test_run: 'verification',
-  build_run: 'verification',
-  lint_run: 'verification',
-  error_encountered: 'debugging',
-  error_resolved: 'debugging',
+  test_run: 'rule_compliance',
+  build_run: 'rule_compliance',
+  lint_run: 'rule_compliance',
   rule_match: 'rule_compliance',
   violation_found: 'rule_compliance',
   fix_applied: 'rule_compliance',
@@ -45,14 +41,10 @@ export const TYPE_CONFIG: Record<string, { icon: string; color: string }> = {
   code_modify: { icon: '✎', color: 'text-orange-600' },
   refactor: { icon: '⟲', color: 'text-orange-600' },
   file_write: { icon: '◆', color: 'text-orange-600' },
-  // verification
-  test_run: { icon: '⚡', color: 'text-yellow-600' },
-  build_run: { icon: '🔧', color: 'text-yellow-600' },
-  lint_run: { icon: '✦', color: 'text-yellow-600' },
-  // debugging
-  error_encountered: { icon: '✕', color: 'text-amber-600' },
-  error_resolved: { icon: '✓', color: 'text-emerald-600' },
   // rule_compliance
+  test_run: { icon: '⚡', color: 'text-rose-600' },
+  build_run: { icon: '🔧', color: 'text-rose-600' },
+  lint_run: { icon: '✦', color: 'text-rose-600' },
   rule_match: { icon: '◎', color: 'text-rose-600' },
   violation_found: { icon: '⊘', color: 'text-rose-600' },
   fix_applied: { icon: '✓', color: 'text-green-600' },
@@ -69,9 +61,7 @@ export const EVENT_TYPE_GROUPS: EventTypeGroup[] = [
   { label: 'Exploration', types: ['code_search', 'doc_read', 'dependency_check', 'file_read'] },
   { label: 'Planning', types: ['task_analysis', 'approach_decision', 'task_complete'] },
   { label: 'Implementation', types: ['code_create', 'code_modify', 'refactor', 'file_write'] },
-  { label: 'Verification', types: ['test_run', 'build_run', 'lint_run'] },
-  { label: 'Debugging', types: ['error_encountered', 'error_resolved'] },
-  { label: 'Rules', types: ['rule_match', 'violation_found', 'fix_applied'] },
+  { label: 'Rules', types: ['test_run', 'build_run', 'lint_run', 'rule_match', 'violation_found', 'fix_applied'] },
 ];
 
 export const CATEGORY_CONFIG: Record<EventCategory, { label: string; color: string }> = {
@@ -79,7 +69,5 @@ export const CATEGORY_CONFIG: Record<EventCategory, { label: string; color: stri
   exploration: { label: 'Exploration', color: 'teal' },
   planning: { label: 'Planning', color: 'purple' },
   implementation: { label: 'Implementation', color: 'orange' },
-  verification: { label: 'Verification', color: 'yellow' },
-  debugging: { label: 'Debugging', color: 'amber' },
   rule_compliance: { label: 'Rules', color: 'rose' },
 };
