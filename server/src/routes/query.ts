@@ -129,6 +129,6 @@ queryRouter.post('/', (req, res) => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     logError('Query', message);
-    res.status(500).json({ error: message });
+    res.json({ ok: true });
   }
 });

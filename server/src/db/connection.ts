@@ -398,6 +398,8 @@ const rulesPathCol = db.prepare(
 ).get() as { notnull: number } | undefined;
 if (rulesPathCol && rulesPathCol.notnull === 1) {
   log('DB','Migrating: making rules_path nullable...');
+  // legacy_alter_table = ON: RENAME 시 자식 테이블의 FK 참조를 자동 변경하지 않도록 방지
+  db.pragma('legacy_alter_table = ON');
   db.exec(`
     ALTER TABLE projects RENAME TO _projects_old;
     CREATE TABLE projects (
@@ -412,7 +414,114 @@ if (rulesPathCol && rulesPathCol.notnull === 1) {
     DROP TABLE _projects_old;
     CREATE UNIQUE INDEX idx_projects_name_unique ON projects(name);
   `);
+  db.pragma('legacy_alter_table = OFF');
   log('DB','Migration complete: rules_path is now nullable');
+}
+
+// Migration: repair broken FK references (_projects_old → projects)
+// ALTER TABLE RENAME with legacy_alter_table=OFF rewrites child FK definitions
+const brokenFk = db.prepare(
+  "SELECT sql FROM sqlite_master WHERE type='table' AND name='events'"
+).get() as { sql: string } | undefined;
+if (brokenFk && brokenFk.sql.includes('_projects_old')) {
+  log('DB','Migrating: repairing broken FK references (_projects_old → projects)...');
+  db.pragma('foreign_keys = OFF');
+  db.exec(`
+    -- events
+    CREATE TABLE events_repair (
+      id TEXT PRIMARY KEY,
+      timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+      type TEXT NOT NULL,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      rule_id TEXT,
+      severity TEXT,
+      file TEXT,
+      line INTEGER,
+      message TEXT,
+      detail TEXT,
+      action TEXT,
+      agent TEXT,
+      step TEXT,
+      duration_ms INTEGER,
+      prompt TEXT,
+      summary TEXT,
+      result TEXT,
+      task_id TEXT
+    );
+    INSERT INTO events_repair SELECT * FROM events;
+    DROP TABLE events;
+    ALTER TABLE events_repair RENAME TO events;
+    CREATE INDEX IF NOT EXISTS idx_events_project ON events(project_id);
+    CREATE INDEX IF NOT EXISTS idx_events_type ON events(type);
+    CREATE INDEX IF NOT EXISTS idx_events_rule ON events(rule_id);
+    CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
+
+    -- rules
+    CREATE TABLE rules_repair (
+      id TEXT NOT NULL,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      category TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      description TEXT,
+      triggers TEXT,
+      content_hash TEXT,
+      parsed_at TEXT DEFAULT (datetime('now')),
+      PRIMARY KEY (id, project_id)
+    );
+    INSERT INTO rules_repair SELECT * FROM rules;
+    DROP TABLE rules;
+    ALTER TABLE rules_repair RENAME TO rules;
+
+    -- action_registry
+    CREATE TABLE action_registry_repair (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      pattern TEXT NOT NULL,
+      pattern_type TEXT NOT NULL DEFAULT 'exact',
+      category TEXT,
+      label TEXT,
+      icon TEXT,
+      confirmed INTEGER NOT NULL DEFAULT 0,
+      sample_count INTEGER NOT NULL DEFAULT 0,
+      first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+      last_seen TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE(project_id, pattern)
+    );
+    INSERT INTO action_registry_repair SELECT * FROM action_registry;
+    DROP TABLE action_registry;
+    ALTER TABLE action_registry_repair RENAME TO action_registry;
+    CREATE INDEX IF NOT EXISTS idx_action_registry_project ON action_registry(project_id);
+
+    -- action_prefixes
+    CREATE TABLE action_prefixes_repair (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      prefix TEXT NOT NULL,
+      category TEXT NOT NULL,
+      label TEXT NOT NULL,
+      icon TEXT,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(project_id, prefix)
+    );
+    INSERT INTO action_prefixes_repair SELECT * FROM action_prefixes;
+    DROP TABLE action_prefixes;
+    ALTER TABLE action_prefixes_repair RENAME TO action_prefixes;
+
+    -- detail_keywords
+    CREATE TABLE detail_keywords_repair (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      project_id TEXT NOT NULL REFERENCES projects(id),
+      keyword TEXT NOT NULL,
+      category TEXT NOT NULL,
+      UNIQUE(project_id, keyword)
+    );
+    INSERT INTO detail_keywords_repair SELECT * FROM detail_keywords;
+    DROP TABLE detail_keywords;
+    ALTER TABLE detail_keywords_repair RENAME TO detail_keywords;
+    CREATE INDEX IF NOT EXISTS idx_detail_keywords_project ON detail_keywords(project_id);
+  `);
+  log('DB','Migration complete: FK references repaired');
 }
 
 db.pragma('foreign_keys = ON');

@@ -36,10 +36,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: 'text', text: JSON.stringify(result) }],
     };
   } catch (err) {
+    // Baden은 모니터링 도구 — 실패해도 AI 에이전트 작업을 방해하지 않는다
     const message = err instanceof Error ? err.message : String(err);
+    console.error(`[baden-mcp] ${tool.name} error: ${message}`);
     return {
-      content: [{ type: 'text', text: `Error: ${message}` }],
-      isError: true,
+      content: [{ type: 'text', text: JSON.stringify({ ok: true }) }],
     };
   }
 });
