@@ -1,5 +1,8 @@
 import { postQuery } from './client.js';
 
+/** taskId → projectName 매핑 (세션 내 메모리) */
+const taskProjectMap = new Map<string, string>();
+
 interface ToolDef {
   name: string;
   description: string;
@@ -21,14 +24,18 @@ export const tools: ToolDef[] = [
       type: 'object',
       properties: {
         prompt: { type: 'string', description: 'The original user instruction' },
+        projectName: { type: 'string', description: 'Project name as defined in CLAUDE.md (e.g. "baden")' },
       },
-      required: ['prompt'],
+      required: ['prompt', 'projectName'],
     },
     handler: async (args) => {
       const taskId = crypto.randomUUID();
+      const projectName = args.projectName as string;
+      taskProjectMap.set(taskId, projectName);
       await postQuery({
         action: 'receive_task',
         prompt: args.prompt,
+        projectName,
         taskId,
       });
       return { taskId };
@@ -46,7 +53,10 @@ export const tools: ToolDef[] = [
         taskId: { type: 'string', description: 'Task ID from baden_start_task' },
         action: {
           type: 'string',
-          description: 'Plan action in snake_case (e.g. plan_refactor_approach, analyze_requirements)',
+          description:
+            'Action in snake_case. The first word determines event classification. ' +
+            'Use planning verbs: plan, analyze, review, decide, compile, synthesize, finalize. ' +
+            '(e.g. plan_refactor_approach, analyze_requirements, review_architecture)',
         },
         reason: { type: 'string', description: 'Specific reasoning or decision details' },
       },
@@ -57,6 +67,7 @@ export const tools: ToolDef[] = [
         action: args.action,
         reason: args.reason,
         taskId: args.taskId,
+        projectName: taskProjectMap.get(args.taskId as string),
       });
     },
   },
@@ -72,7 +83,11 @@ export const tools: ToolDef[] = [
         taskId: { type: 'string', description: 'Task ID from baden_start_task' },
         action: {
           type: 'string',
-          description: 'Action description (e.g. read_auth_logic, modify_handler, search_usage)',
+          description:
+            'Action in snake_case. The first word determines event classification. ' +
+            'For reading/searching: read, search, scan, find, list, identify. ' +
+            'For code changes: modify, create, add, update, write, fix, edit, delete. ' +
+            '(e.g. read_auth_logic, modify_handler, search_usage, create_migration)',
         },
         target: { type: 'string', description: 'Target file path or search query' },
         reason: { type: 'string', description: 'Why this action is needed' },
@@ -85,6 +100,7 @@ export const tools: ToolDef[] = [
         target: args.target,
         reason: args.reason,
         taskId: args.taskId,
+        projectName: taskProjectMap.get(args.taskId as string),
       });
     },
   },
@@ -100,7 +116,11 @@ export const tools: ToolDef[] = [
         taskId: { type: 'string', description: 'Task ID from baden_start_task' },
         action: {
           type: 'string',
-          description: 'Verification action (e.g. run_auth_tests, build_project, lint_check)',
+          description:
+            'Action in snake_case. The first word determines event classification. ' +
+            'Use verification verbs: test, build, lint, typecheck, validate, verify. ' +
+            '"run" prefix is ignored — place the verb after it (e.g. run_test, run_build). ' +
+            '(e.g. test_auth_flow, build_project, lint_check, run_typecheck)',
         },
         result: {
           type: 'string',
@@ -116,6 +136,7 @@ export const tools: ToolDef[] = [
         result: args.result,
         target: args.target,
         taskId: args.taskId,
+        projectName: taskProjectMap.get(args.taskId as string),
       });
     },
   },
@@ -131,7 +152,10 @@ export const tools: ToolDef[] = [
         taskId: { type: 'string', description: 'Task ID from baden_start_task' },
         action: {
           type: 'string',
-          description: 'Rule action (e.g. violation_found, fix_applied, rule_match)',
+          description:
+            'Action in snake_case. The first word determines event classification. ' +
+            'Use rule-compliance verbs: violation, check, rule. ' +
+            '(e.g. violation_found, check_c5_compliance, rule_match)',
         },
         ruleId: { type: 'string', description: 'Rule ID (e.g. C1, S-react-query)' },
         severity: {
@@ -152,6 +176,7 @@ export const tools: ToolDef[] = [
         target: args.target,
         reason: args.reason,
         taskId: args.taskId,
+        projectName: taskProjectMap.get(args.taskId as string),
       });
     },
   },
@@ -169,11 +194,16 @@ export const tools: ToolDef[] = [
       required: ['taskId', 'summary'],
     },
     handler: async (args) => {
-      return postQuery({
+      const taskId = args.taskId as string;
+      const projectName = taskProjectMap.get(taskId);
+      const result = await postQuery({
         action: 'task_complete',
         summary: args.summary,
-        taskId: args.taskId,
+        taskId,
+        projectName,
       });
+      taskProjectMap.delete(taskId);
+      return result;
     },
   },
 ];

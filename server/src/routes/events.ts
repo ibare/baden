@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
 import { processEvent } from '../services/event-processor.js';
+import { log, error as logError } from '../logger.js';
 import type { EventInput } from '../types.js';
 
 export const eventsRouter = Router();
@@ -10,12 +11,12 @@ eventsRouter.post('/', (req, res) => {
   try {
     const body = req.body;
     const inputs: EventInput[] = Array.isArray(body) ? body : [body];
-    console.log(`[Events] POST ${inputs.length} event(s): ${inputs.map((i) => i.type).join(', ')}`);
+    log('Events', `POST ${inputs.length} event(s): ${inputs.map((i) => i.type).join(', ')}`);
     const results = inputs.map((input) => processEvent(input));
     res.status(201).json(Array.isArray(body) ? results : results[0]);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error(`[Events] Error: ${message}`);
+    logError('Events', message);
     res.status(500).json({ error: message });
   }
 });

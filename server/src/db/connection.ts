@@ -2,6 +2,7 @@ import Database, { type Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import { log } from '../logger.js';
 
 const badenHome = path.join(os.homedir(), '.baden');
 fs.mkdirSync(badenHome, { recursive: true });
@@ -61,7 +62,7 @@ db.exec(`
 // Migration: remove sessions table and session_id FK from events
 const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'").get();
 if (tables) {
-  console.log('[DB] Migrating: removing sessions...');
+  log('DB','Migrating: removing sessions...');
   db.pragma('foreign_keys = OFF');
   db.exec(`
     CREATE TABLE events_new (
@@ -90,13 +91,13 @@ if (tables) {
     CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
     DROP TABLE sessions;
   `);
-  console.log('[DB] Migration complete: sessions removed');
+  log('DB','Migration complete: sessions removed');
 }
 
 // Migration: add prompt, summary, result, task_id columns
 const hasTaskId = db.prepare("SELECT COUNT(*) as cnt FROM pragma_table_info('events') WHERE name='task_id'").get() as { cnt: number };
 if (hasTaskId.cnt === 0) {
-  console.log('[DB] Migrating: adding prompt, summary, result, task_id columns...');
+  log('DB','Migrating: adding prompt, summary, result, task_id columns...');
   db.exec(`
     ALTER TABLE events ADD COLUMN prompt TEXT;
     ALTER TABLE events ADD COLUMN summary TEXT;
@@ -104,24 +105,24 @@ if (hasTaskId.cnt === 0) {
     ALTER TABLE events ADD COLUMN task_id TEXT;
     CREATE INDEX IF NOT EXISTS idx_events_task ON events(task_id);
   `);
-  console.log('[DB] Migration complete: new columns added');
+  log('DB','Migration complete: new columns added');
 }
 
 // Migration: convert old datetime('now') timestamps to ISO 8601
 const oldTimestamp = db.prepare("SELECT id FROM events WHERE timestamp NOT LIKE '%T%' LIMIT 1").get();
 if (oldTimestamp) {
-  console.log('[DB] Migrating: converting timestamps to ISO 8601...');
+  log('DB','Migrating: converting timestamps to ISO 8601...');
   db.exec(`
     UPDATE events SET timestamp = replace(timestamp, ' ', 'T') || '.000Z'
     WHERE timestamp NOT LIKE '%T%';
   `);
-  console.log('[DB] Migration complete: timestamps converted');
+  log('DB','Migration complete: timestamps converted');
 }
 
 // Migration: create action_registry table
 const hasActionRegistry = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='action_registry'").get();
 if (!hasActionRegistry) {
-  console.log('[DB] Migrating: creating action_registry table...');
+  log('DB','Migrating: creating action_registry table...');
   db.exec(`
     CREATE TABLE action_registry (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -139,13 +140,13 @@ if (!hasActionRegistry) {
     );
     CREATE INDEX idx_action_registry_project ON action_registry(project_id);
   `);
-  console.log('[DB] Migration complete: action_registry table created');
+  log('DB','Migration complete: action_registry table created');
 }
 
 // Migration: create action_prefixes table
 const hasActionPrefixes = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='action_prefixes'").get();
 if (!hasActionPrefixes) {
-  console.log('[DB] Migrating: creating action_prefixes table...');
+  log('DB','Migrating: creating action_prefixes table...');
   db.exec(`
     CREATE TABLE action_prefixes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -162,7 +163,7 @@ if (!hasActionPrefixes) {
   // Seed from existing wildcard entries if any projects exist
   const projectRows = db.prepare("SELECT id FROM projects").all() as { id: string }[];
   if (projectRows.length > 0) {
-    console.log('[DB] Seeding action_prefixes from wildcard patterns...');
+    log('DB','Seeding action_prefixes from wildcard patterns...');
     const seedData: { prefix: string; category: string; label: string; icon: string | null }[] = [
       // exploration
       { prefix: 'read', category: 'exploration', label: 'Read', icon: 'BookOpen' },
@@ -227,16 +228,16 @@ if (!hasActionPrefixes) {
       }
     });
     tx();
-    console.log(`[DB] Seeded ${seedData.length} prefixes for ${projectRows.length} project(s)`);
+    log('DB',`Seeded ${seedData.length} prefixes for ${projectRows.length} project(s)`);
   }
 
-  console.log('[DB] Migration complete: action_prefixes table created');
+  log('DB','Migration complete: action_prefixes table created');
 }
 
 // Migration: create detail_keywords table
 const hasDetailKeywords = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='detail_keywords'").get();
 if (!hasDetailKeywords) {
-  console.log('[DB] Migrating: creating detail_keywords table...');
+  log('DB','Migrating: creating detail_keywords table...');
   db.exec(`
     CREATE TABLE detail_keywords (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -251,7 +252,7 @@ if (!hasDetailKeywords) {
   // Seed default keywords for existing projects
   const projectRows2 = db.prepare("SELECT id FROM projects").all() as { id: string }[];
   if (projectRows2.length > 0) {
-    console.log('[DB] Seeding detail_keywords...');
+    log('DB','Seeding detail_keywords...');
     const keywordSeed: { keyword: string; category: string }[] = [
       { keyword: 'test', category: 'rule_compliance' },
       { keyword: 'tests', category: 'rule_compliance' },
@@ -279,10 +280,10 @@ if (!hasDetailKeywords) {
       }
     });
     tx2();
-    console.log(`[DB] Seeded ${keywordSeed.length} keywords for ${projectRows2.length} project(s)`);
+    log('DB',`Seeded ${keywordSeed.length} keywords for ${projectRows2.length} project(s)`);
   }
 
-  console.log('[DB] Migration complete: detail_keywords table created');
+  log('DB','Migration complete: detail_keywords table created');
 }
 
 // Migration: collapse debugging/verification → implementation/rule_compliance
@@ -290,7 +291,7 @@ const hasOldCategories = db.prepare(
   "SELECT COUNT(*) as cnt FROM action_prefixes WHERE category IN ('debugging', 'verification')"
 ).get() as { cnt: number };
 if (hasOldCategories.cnt > 0) {
-  console.log('[DB] Migrating: collapsing debugging/verification categories...');
+  log('DB','Migrating: collapsing debugging/verification categories...');
   db.exec(`
     UPDATE action_prefixes SET category = 'implementation' WHERE category = 'debugging';
     UPDATE action_prefixes SET category = 'rule_compliance' WHERE category = 'verification';
@@ -298,7 +299,7 @@ if (hasOldCategories.cnt > 0) {
     UPDATE detail_keywords SET category = 'rule_compliance' WHERE category = 'verification';
     UPDATE events SET type = 'code_modify' WHERE type IN ('error_encountered', 'error_resolved');
   `);
-  console.log('[DB] Migration complete: categories collapsed');
+  log('DB','Migration complete: categories collapsed');
 }
 
 // Migration: reclassify events with type='query' using word decomposition algorithm
@@ -306,7 +307,7 @@ const queryEventCount = db.prepare(
   "SELECT COUNT(*) as cnt FROM events WHERE type = 'query' AND action IS NOT NULL"
 ).get() as { cnt: number };
 if (queryEventCount.cnt > 0) {
-  console.log(`[DB] Migrating: reclassifying ${queryEventCount.cnt} query events...`);
+  log('DB',`Migrating: reclassifying ${queryEventCount.cnt} query events...`);
   const WORD_TO_TYPE: Record<string, string> = {
     rule: 'rule_match', violation: 'rule_match', check: 'rule_match',
     verify: 'build_run', test: 'build_run', build: 'build_run', typecheck: 'build_run', lint: 'build_run', validate: 'build_run',
@@ -343,10 +344,10 @@ if (queryEventCount.cnt > 0) {
         reclassified++;
       }
     }
-    console.log(`[DB] Reclassified ${reclassified}/${rows.length} events`);
+    log('DB',`Reclassified ${reclassified}/${rows.length} events`);
   });
   tx();
-  console.log('[DB] Migration complete: query events reclassified');
+  log('DB','Migration complete: query events reclassified');
 }
 
 // Migration: localize Korean labels to English in action_prefixes
@@ -354,7 +355,7 @@ const hasKoreanLabels = db.prepare(
   "SELECT COUNT(*) as cnt FROM action_prefixes WHERE label = '읽기'"
 ).get() as { cnt: number };
 if (hasKoreanLabels.cnt > 0) {
-  console.log('[DB] Migrating: localizing action_prefixes labels to English...');
+  log('DB','Migrating: localizing action_prefixes labels to English...');
   const labelMap: [string, string][] = [
     ['읽기', 'Read'], ['검색', 'Search'], ['찾기', 'Find'], ['확인', 'Check'],
     ['목록', 'List'], ['조회', 'Get'], ['보기', 'View'],
@@ -378,9 +379,52 @@ if (hasKoreanLabels.cnt > 0) {
     }
   });
   tx();
-  console.log('[DB] Migration complete: labels localized to English');
+  log('DB','Migration complete: labels localized to English');
+}
+
+// Migration: add UNIQUE index on projects(name)
+const hasNameUniqueIdx = db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_projects_name_unique'"
+).get();
+if (!hasNameUniqueIdx) {
+  log('DB','Migrating: adding UNIQUE index on projects(name)...');
+  db.exec(`CREATE UNIQUE INDEX idx_projects_name_unique ON projects(name)`);
+  log('DB','Migration complete: projects(name) unique index added');
+}
+
+// Migration: make rules_path nullable
+const rulesPathCol = db.prepare(
+  "SELECT \"notnull\" FROM pragma_table_info('projects') WHERE name='rules_path'"
+).get() as { notnull: number } | undefined;
+if (rulesPathCol && rulesPathCol.notnull === 1) {
+  log('DB','Migrating: making rules_path nullable...');
+  db.exec(`
+    ALTER TABLE projects RENAME TO _projects_old;
+    CREATE TABLE projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      rules_path TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+    INSERT INTO projects SELECT * FROM _projects_old;
+    DROP TABLE _projects_old;
+    CREATE UNIQUE INDEX idx_projects_name_unique ON projects(name);
+  `);
+  log('DB','Migration complete: rules_path is now nullable');
 }
 
 db.pragma('foreign_keys = ON');
+
+const _selectProjectIdByName = db.prepare<
+  { name: string },
+  { id: string }
+>('SELECT id FROM projects WHERE name = @name');
+
+export function getProjectIdByName(name: string): string | undefined {
+  const row = _selectProjectIdByName.get({ name });
+  return row?.id;
+}
 
 export default db;

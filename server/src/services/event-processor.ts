@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import db from '../db/connection.js';
 import { broadcast } from '../ws.js';
 import { registerAction } from './action-registry.js';
+import { log } from '../logger.js';
 import type { EventInput, RuleEvent } from '../types.js';
 
 const insertEvent = db.prepare(`
@@ -15,7 +16,7 @@ export function processEvent(input: EventInput): RuleEvent {
   const id = crypto.randomUUID();
   const timestamp = new Date().toISOString();
 
-  console.log(`[Event] ${input.type} | project=${input.projectId}${input.file ? ` | file=${input.file}` : ''}${input.message ? ` | ${input.message}` : ''}`);
+  log('Event', `${input.type} | project=${input.projectId}${input.action ? ` | action=${input.action}` : ''}${input.file ? ` | file=${input.file}` : ''}${input.message ? ` | ${input.message}` : ''}`);
 
   insertEvent.run(
     id,

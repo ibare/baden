@@ -20,7 +20,7 @@ export interface RootOutletContext {
 }
 
 export function RootLayout() {
-  const { projects, selectedProject, setSelectedProject, addProject } = useProject();
+  const { projects, selectedProject, setSelectedProject, addProject, updateProject } = useProject();
   const { prefixes, keywords, resolveAction, resolveCategory, resolveIcon, refresh: refreshRegistry } =
     useActionRegistry(selectedProject);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,6 +32,13 @@ export function RootLayout() {
       setSelectedProject(project.id);
     },
     [addProject, setSelectedProject],
+  );
+
+  const handleProjectUpdated = useCallback(
+    (project: Project) => {
+      updateProject(project);
+    },
+    [updateProject],
   );
 
   const outletContext: RootOutletContext = {
@@ -56,6 +63,7 @@ export function RootLayout() {
           selectedProject={selectedProject}
           onSelectProject={setSelectedProject}
           onProjectCreated={handleProjectCreated}
+          onProjectUpdated={handleProjectUpdated}
         />
       </div>
 

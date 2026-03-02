@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import yaml from 'yaml';
+import { warn } from '../logger.js';
 import type { ParsedRule, IndexYaml, IndexYamlEntry, RuleCategory } from '../types.js';
 
 function computeHash(content: string): string {
@@ -20,7 +21,7 @@ function parseEntry(
   const fullPath = path.resolve(rulesPath, entry.file);
 
   if (!fs.existsSync(fullPath)) {
-    console.warn(`[RuleParser] File not found: ${fullPath}`);
+    warn('RuleParser', `File not found: ${fullPath}`);
     return null;
   }
 

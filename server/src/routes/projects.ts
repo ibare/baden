@@ -18,6 +18,11 @@ const insertRule = db.prepare(`
   VALUES (?, ?, ?, ?, ?, ?, ?)
 `);
 
+const updateProject = db.prepare(`
+  UPDATE projects SET name = ?, description = ?, rules_path = ?, updated_at = datetime('now')
+  WHERE id = ?
+`);
+
 const deleteRulesByProject = db.prepare(`
   DELETE FROM rules WHERE project_id = ?
 `);
@@ -27,36 +32,37 @@ projectsRouter.post('/', (req, res) => {
   try {
     const { name, description, rulesPath } = req.body;
 
-    if (!name || !rulesPath) {
-      res.status(400).json({ error: 'name and rulesPath are required' });
+    if (!name) {
+      res.status(400).json({ error: 'name is required' });
       return;
     }
 
     const id = `bdn_${nanoid(8)}`;
 
-    // Parse rules
-    const parsedRules = parseRules(rulesPath);
-
     // Insert project
-    insertProject.run(id, name, description || null, rulesPath);
+    insertProject.run(id, name, description || null, rulesPath || null);
 
-    // Insert rules
-    for (const rule of parsedRules) {
-      insertRule.run(
-        rule.id,
-        id,
-        rule.category,
-        rule.filePath,
-        rule.description,
-        rule.triggers ? JSON.stringify(rule.triggers) : null,
-        rule.contentHash,
-      );
+    // Parse and insert rules if rulesPath provided
+    let parsedRules: ReturnType<typeof parseRules> = [];
+    if (rulesPath) {
+      parsedRules = parseRules(rulesPath);
+      for (const rule of parsedRules) {
+        insertRule.run(
+          rule.id,
+          id,
+          rule.category,
+          rule.filePath,
+          rule.description,
+          rule.triggers ? JSON.stringify(rule.triggers) : null,
+          rule.contentHash,
+        );
+      }
     }
 
     res.status(201).json({
       id,
       name,
-      rulesPath,
+      rulesPath: rulesPath || null,
       rules: parsedRules,
     });
   } catch (err: unknown) {
@@ -124,6 +130,11 @@ projectsRouter.get('/:id/rules/:ruleId/content', (req, res) => {
     return;
   }
 
+  if (!project.rules_path) {
+    res.status(400).json({ error: 'Project has no rules_path configured' });
+    return;
+  }
+
   const fullPath = path.resolve(project.rules_path, rule.file_path);
   if (!fs.existsSync(fullPath)) {
     res.status(404).json({ error: 'File not found' });
@@ -144,12 +155,43 @@ projectsRouter.get('/:id/rules/:ruleId/content', (req, res) => {
   res.json({ title, body });
 });
 
+// PUT /api/projects/:id - 프로젝트 정보 수정
+projectsRouter.put('/:id', (req, res) => {
+  try {
+    const { name, description, rulesPath } = req.body;
+
+    if (!name) {
+      res.status(400).json({ error: 'name is required' });
+      return;
+    }
+
+    const existing = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id) as Project | undefined;
+    if (!existing) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    updateProject.run(name, description || null, rulesPath || null, req.params.id);
+
+    const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
+    res.json(updated);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
 // PUT /api/projects/:id/sync - rules 디렉토리 재스캔
 projectsRouter.put('/:id/sync', (req, res) => {
   try {
     const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id) as Project | undefined;
     if (!project) {
       res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    if (!project.rules_path) {
+      res.status(400).json({ error: 'Project has no rules_path configured' });
       return;
     }
 

@@ -7,6 +7,7 @@ import { WebSocketServer } from 'ws';
 import { URL, fileURLToPath } from 'url';
 import { initializeDatabase } from './db/schema.js';
 import { addClient, removeClient } from './ws.js';
+import { log } from './logger.js';
 import { projectsRouter } from './routes/projects.js';
 import { eventsRouter } from './routes/events.js';
 import { queryRouter } from './routes/query.js';
@@ -24,14 +25,14 @@ app.use((req, res, next) => {
   const start = Date.now();
   res.on('finish', () => {
     const ms = Date.now() - start;
-    console.log(`[HTTP] ${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`);
+    log('HTTP', `${req.method} ${req.originalUrl} ${res.statusCode} ${ms}ms`);
   });
   next();
 });
 
 // Initialize DB
 initializeDatabase();
-console.log('[Baden] Database initialized');
+log('Baden', 'Database initialized');
 
 // Routes
 app.use('/api/projects', projectsRouter);
@@ -68,15 +69,15 @@ wss.on('connection', (ws, req) => {
   const projectId = url.searchParams.get('projectId') || undefined;
   addClient(ws, projectId);
 
-  console.log(`[WS] Client connected (projectId: ${projectId || 'all'})`);
+  log('WS', `Client connected (projectId: ${projectId || 'all'})`);
 
   ws.on('close', () => {
     removeClient(ws);
-    console.log('[WS] Client disconnected');
+    log('WS', 'Client disconnected');
   });
 });
 
 server.listen(PORT, () => {
-  console.log(`[Baden] Server running on http://localhost:${PORT}`);
-  console.log(`[Baden] WebSocket on ws://localhost:${PORT}/ws`);
+  log('Baden', `Server running on http://localhost:${PORT}`);
+  log('Baden', `WebSocket on ws://localhost:${PORT}/ws`);
 });

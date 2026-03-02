@@ -1,14 +1,16 @@
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { Project } from '@/lib/api';
-import { CreateProjectDialog } from '@/components/domain/CreateProjectDialog';
+import { ProjectDialog } from '@/components/domain/ProjectDialog';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Plus, Monitor, Sliders } from '@phosphor-icons/react';
+import { FolderOpen, Plus, Monitor, Sliders, PencilSimple } from '@phosphor-icons/react';
 
 interface SidebarProps {
   projects: Project[];
   selectedProject: string;
   onSelectProject: (id: string) => void;
   onProjectCreated: (project: Project) => void;
+  onProjectUpdated: (project: Project) => void;
 }
 
 export function Sidebar({
@@ -16,9 +18,11 @@ export function Sidebar({
   selectedProject,
   onSelectProject,
   onProjectCreated,
+  onProjectUpdated,
 }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   const navItems = [
     { path: '/', label: 'Monitor', icon: Monitor },
@@ -57,19 +61,30 @@ export function Sidebar({
         {projects.map((p) => {
           const isActive = p.id === selectedProject;
           return (
-            <button
-              key={p.id}
-              onClick={() => onSelectProject(p.id)}
-              className={cn(
-                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors text-left',
-                isActive
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-              )}
-            >
-              <FolderOpen size={16} className="flex-shrink-0" />
-              <span className="truncate">{p.name}</span>
-            </button>
+            <div key={p.id} className="group relative">
+              <button
+                onClick={() => onSelectProject(p.id)}
+                className={cn(
+                  'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors text-left',
+                  isActive
+                    ? 'bg-accent text-accent-foreground'
+                    : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+                )}
+              >
+                <FolderOpen size={16} className="flex-shrink-0" />
+                <span className="truncate">{p.name}</span>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setEditingProject(p);
+                }}
+                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity text-muted-foreground hover:text-foreground"
+                title="Edit project"
+              >
+                <PencilSimple size={14} />
+              </button>
+            </div>
           );
         })}
 
@@ -81,13 +96,26 @@ export function Sidebar({
       </nav>
 
       <div className="p-2 border-t border-border">
-        <CreateProjectDialog onCreated={onProjectCreated}>
+        <ProjectDialog onCreated={onProjectCreated}>
           <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors">
             <Plus size={16} />
             Add Project
           </button>
-        </CreateProjectDialog>
+        </ProjectDialog>
       </div>
+
+      {/* Edit project dialog */}
+      {editingProject && (
+        <ProjectDialog
+          project={editingProject}
+          open={!!editingProject}
+          onOpenChange={(open) => { if (!open) setEditingProject(null); }}
+          onUpdated={(updated) => {
+            onProjectUpdated(updated);
+            setEditingProject(null);
+          }}
+        />
+      )}
     </aside>
   );
 }

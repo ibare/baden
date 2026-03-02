@@ -16,7 +16,7 @@ export interface Project {
   id: string;
   name: string;
   description: string | null;
-  rules_path: string;
+  rules_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -98,8 +98,11 @@ export const api = {
   getEventDates: (projectId: string) =>
     request<{ date: string; count: number }[]>(`/events/dates?projectId=${projectId}`),
 
-  createProject: (data: { name: string; description?: string; rulesPath: string }) =>
+  createProject: (data: { name: string; description?: string; rulesPath?: string }) =>
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(data) }),
+
+  updateProject: (id: string, data: { name: string; description?: string; rulesPath?: string }) =>
+    request<Project>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   // Action Registry
   getActionRegistry: (projectId: string) =>

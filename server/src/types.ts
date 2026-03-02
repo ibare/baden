@@ -59,7 +59,7 @@ export interface Project {
   id: string;
   name: string;
   description: string | null;
-  rules_path: string;
+  rules_path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -116,7 +116,8 @@ export interface EventInput {
 }
 
 export interface QueryInput {
-  projectId: string;
+  projectId?: string;
+  projectName?: string;
   phase?: string;
   action: string;
   target?: string;

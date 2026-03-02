@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { processEvent } from '../services/event-processor.js';
+import { getProjectIdByName } from '../db/connection.js';
+import { log, error as logError } from '../logger.js';
 import type { QueryInput, EventInput, EventType, Severity } from '../types.js';
 
 export const queryRouter = Router();
@@ -88,17 +90,26 @@ queryRouter.post('/', (req, res) => {
   try {
     const q: QueryInput = req.body;
 
-    if (!q.projectId || !q.action) {
-      res.status(400).json({ error: 'projectId and action are required' });
+    if (!q.action || !q.projectName) {
+      log('Query', `SKIP missing=${!q.action ? 'action' : 'projectName'} received=${JSON.stringify(q)}`);
+      res.json({ ok: true });
+      return;
+    }
+
+    // Resolve projectId via projectName lookup
+    const projectId = getProjectIdByName(q.projectName);
+    if (!projectId) {
+      log('Query', `SKIP project="${q.projectName}" not registered action="${q.action}"`);
+      res.json({ ok: true });
       return;
     }
 
     const eventType = inferEventType(q.action, q.phase, q.ruleId);
-    console.log(`[Query] action="${q.action}" → type=${eventType}`);
+    log('Query', `project="${q.projectName}" action="${q.action}" → ${eventType}${q.ruleId ? ` rule=${q.ruleId}` : ''}${q.target ? ` target=${q.target}` : ''}`);
 
     const input: EventInput = {
       type: eventType,
-      projectId: q.projectId,
+      projectId,
       step: q.phase,
       action: q.action,
       file: q.target,
@@ -117,7 +128,7 @@ queryRouter.post('/', (req, res) => {
     res.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    console.error(`[Query] Error: ${message}`);
+    logError('Query', message);
     res.status(500).json({ error: message });
   }
 });
