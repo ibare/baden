@@ -38,10 +38,16 @@ export function useTimelineLayout(
   expandLevel?: ExpandLevel,
 ): LayoutResult {
   // Stage 1: Convert RuleEvents → TimelineItems
+  // Duration은 글로벌 다음 이벤트까지의 gap으로 추론 (에이전트는 순차 실행이므로 카테고리 무관)
   const items = useMemo((): TimelineItem[] => {
     const sorted = [...events].sort(
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
     );
+
+    // Signal actions: point-in-time markers, always instant
+    const SIGNAL_ACTIONS = new Set(['receive_task', 'task_complete']);
+
+    const startTimes = sorted.map((e) => new Date(e.timestamp).getTime());
 
     return sorted.map((e, i) => {
       const resolved = resolveAction ? resolveAction(e.action, e.type) : null;
@@ -50,15 +56,23 @@ export function useTimelineLayout(
         : resolved
           ? resolved.category
           : (EVENT_CATEGORY_MAP[e.type] || 'exploration');
-      const startMs = new Date(e.timestamp).getTime();
+      const startMs = startTimes[i];
+      const resolvedIcon = resolved?.icon ?? null;
+      const resolvedLabel = resolved?.label;
+      const resolvedDetail = resolved?.keyword ? `[${resolved.keyword}]` : undefined;
+
+      // Signal events → instant (point-in-time markers, not duration-based)
+      if (SIGNAL_ACTIONS.has(e.action ?? '')) {
+        return { id: e.id, event: e, category: cat, startMs, endMs: startMs, isInstant: true, truncated: false, resolvedIcon, resolvedLabel, resolvedDetail };
+      }
+
       let endMs: number;
       let truncated = false;
 
       if (e.duration_ms) {
         endMs = startMs + e.duration_ms;
       } else if (i < sorted.length - 1) {
-        const nextStart = new Date(sorted[i + 1].timestamp).getTime();
-        const gap = nextStart - startMs;
+        const gap = startTimes[i + 1] - startMs;
         if (gap > MAX_GAP_DURATION_MS) {
           endMs = startMs + MAX_GAP_DURATION_MS;
           truncated = true;
@@ -71,10 +85,6 @@ export function useTimelineLayout(
       }
 
       const isInstant = endMs - startMs < INSTANT_THRESHOLD_MS;
-      const resolvedIcon = resolved?.icon ?? null;
-      const resolvedLabel = resolved?.label;
-      const resolvedDetail = resolved?.keyword ? `[${resolved.keyword}]` : undefined;
-
       return { id: e.id, event: e, category: cat, startMs, endMs, isInstant, truncated, resolvedIcon, resolvedLabel, resolvedDetail };
     });
   }, [events, resolveAction]);
