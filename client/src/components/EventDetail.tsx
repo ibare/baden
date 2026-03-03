@@ -252,9 +252,71 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
   const catConfig = category ? CATEGORY_CONFIG[category] : null;
   const typeConfig = TYPE_CONFIG[event.type];
   const time = new Date(event.timestamp).toLocaleTimeString('en-US', { hour12: false });
-  const detail = parseDetail(event.detail);
+  const detail = parseDetail(event.detail) ?? {};
+  const consumedDetailKeys = new Set<string>();
 
-  const hasActivity = event.message || event.summary || event.result || event.prompt;
+  const consumeIfPresent = (...keys: string[]) => {
+    for (const key of keys) {
+      if (detail[key] !== undefined) consumedDetailKeys.add(key);
+    }
+  };
+
+  const takeDetail = (...keys: string[]): string | null => {
+    for (const key of keys) {
+      if (detail[key] !== undefined) {
+        consumedDetailKeys.add(key);
+        return detail[key];
+      }
+    }
+    return null;
+  };
+
+  if (event.action) consumeIfPresent('action');
+  if (event.task_id) consumeIfPresent('taskId', 'task_id');
+  if (event.file) consumeIfPresent('file', 'target');
+  if (event.rule_id) consumeIfPresent('ruleId', 'rule_id');
+  if (event.message) consumeIfPresent('reason', 'message');
+  if (event.prompt) consumeIfPresent('prompt');
+  if (event.summary) consumeIfPresent('summary');
+  if (event.result) consumeIfPresent('result');
+  if (event.severity) consumeIfPresent('severity');
+  if (event.agent) consumeIfPresent('agent');
+  if (event.duration_ms != null) consumeIfPresent('durationMs', 'duration_ms');
+  if (event.step) consumeIfPresent('step', 'phase');
+  consumeIfPresent('projectId', 'project_id', 'projectName');
+
+  const actionTitle = event.action || takeDetail('action') || event.type.replace(/_/g, ' ');
+  const taskIdValue = event.task_id || takeDetail('taskId', 'task_id');
+  const fileValue = event.file || takeDetail('file');
+  const targetValue = takeDetail('target');
+  const ruleIdValue = event.rule_id || takeDetail('ruleId', 'rule_id');
+
+  if (fileValue && targetValue) {
+    consumeIfPresent('target');
+  }
+
+  type ActivityRow = {
+    key: string;
+    label: string;
+    value: string;
+    kind?: 'text' | 'multiline' | 'prompt' | 'result';
+  };
+
+  const activityRows: ActivityRow[] = [];
+  if (event.message) activityRows.push({ key: 'message', label: 'Reason', value: event.message, kind: 'multiline' });
+  if (event.prompt) activityRows.push({ key: 'prompt', label: 'Prompt', value: event.prompt, kind: 'prompt' });
+  if (event.summary) activityRows.push({ key: 'summary', label: 'Summary', value: event.summary, kind: 'multiline' });
+  if (event.result) activityRows.push({ key: 'result', label: 'Result', value: event.result, kind: 'result' });
+  if (event.severity) activityRows.push({ key: 'severity', label: 'Severity', value: event.severity });
+  if (event.agent) activityRows.push({ key: 'agent', label: 'Agent', value: event.agent });
+  if (event.duration_ms != null) activityRows.push({ key: 'duration_ms', label: 'Duration', value: `${event.duration_ms}ms` });
+  if (event.step) activityRows.push({ key: 'step', label: 'Step', value: event.step });
+  for (const [key, value] of Object.entries(detail)) {
+    if (consumedDetailKeys.has(key) || key === 'action') continue;
+    activityRows.push({ key: `detail_${key}`, label: key, value });
+  }
+
+  const hasActivity = activityRows.length > 0;
 
   return (
     <div className="flex flex-col p-4 overflow-y-auto">
@@ -262,7 +324,7 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
       <div className="flex items-center gap-2 mb-1">
         {typeConfig && <span className={`text-lg ${typeConfig.color}`}>{typeConfig.icon}</span>}
         <span className="text-base font-bold text-foreground">
-          {event.action || event.type.replace(/_/g, ' ')}
+          {actionTitle}
         </span>
       </div>
 
@@ -285,41 +347,37 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
           </span>
         </Row>
         <Row label="Time"><span className="font-mono text-xs">{time}</span></Row>
-        {event.file && (
+        <Row label="Task ID">
+          {taskIdValue ? (
+            <span className="font-mono text-[10px]">{taskIdValue}</span>
+          ) : (
+            '-'
+          )}
+        </Row>
+        {fileValue ? (
           <Row label="File">
-            <span className="font-mono text-xs">{event.file}{event.line ? `:${event.line}` : ''}</span>
+            <span className="font-mono text-xs">{fileValue}{event.line ? `:${event.line}` : ''}</span>
           </Row>
-        )}
-        {event.rule_id && (
+        ) : targetValue ? (
+          <Row label="Target">
+            <span className="font-mono text-xs">{targetValue}</span>
+          </Row>
+        ) : null}
+        {ruleIdValue && (
           <Row label="Rule">
-            {rule ? (
+            {rule && event.rule_id ? (
               <button
                 type="button"
                 onClick={handleFileClick}
                 className="font-mono text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2 cursor-pointer hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
               >
-                {event.rule_id}
+                {ruleIdValue}
               </button>
             ) : (
-              <span className="font-mono text-xs">{event.rule_id}</span>
+              <span className="font-mono text-xs">{ruleIdValue}</span>
             )}
           </Row>
         )}
-        {event.severity && <Row label="Severity">{event.severity}</Row>}
-        {event.task_id && (
-          <Row label="Task ID"><span className="font-mono text-[10px]">{event.task_id}</span></Row>
-        )}
-        {event.agent && <Row label="Agent">{event.agent}</Row>}
-        {event.duration_ms != null && <Row label="Duration">{event.duration_ms}ms</Row>}
-
-        {/* Parsed detail JSON fields */}
-        {detail && Object.entries(detail).map(([key, value]) => (
-          <Row key={key} label={key}>
-            {value.length > 120
-              ? <span className="font-mono text-xs">{value}</span>
-              : value}
-          </Row>
-        ))}
       </dl>
 
       {/* Activity section */}
@@ -328,30 +386,25 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
           <Divider />
           <SectionTitle>Activity</SectionTitle>
           <dl>
-            {event.message && (
-              <Row label="Reason">
-                <span className="font-normal whitespace-pre-wrap">{event.message}</span>
+            {activityRows.map((row) => (
+              <Row key={row.key} label={row.label}>
+                {row.kind === 'result' ? (
+                  <pre className="font-mono text-xs whitespace-pre-wrap bg-muted/50 rounded px-2 py-1 max-h-48 overflow-y-auto">
+                    {row.value}
+                  </pre>
+                ) : row.kind === 'prompt' ? (
+                  <span className="font-normal text-xs whitespace-pre-wrap bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1 inline-block">
+                    {row.value}
+                  </span>
+                ) : row.kind === 'multiline' ? (
+                  <span className="font-normal whitespace-pre-wrap">{row.value}</span>
+                ) : row.value.length > 120 ? (
+                  <span className="font-mono text-xs">{row.value}</span>
+                ) : (
+                  row.value
+                )}
               </Row>
-            )}
-            {event.summary && (
-              <Row label="Summary">
-                <span className="font-normal whitespace-pre-wrap">{event.summary}</span>
-              </Row>
-            )}
-            {event.prompt && (
-              <Row label="Prompt">
-                <span className="font-normal text-xs whitespace-pre-wrap bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1 inline-block">
-                  {event.prompt}
-                </span>
-              </Row>
-            )}
-            {event.result && (
-              <Row label="Result">
-                <pre className="font-mono text-xs whitespace-pre-wrap bg-muted/50 rounded px-2 py-1 max-h-48 overflow-y-auto">
-                  {event.result}
-                </pre>
-              </Row>
-            )}
+            ))}
           </dl>
         </>
       )}
