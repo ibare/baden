@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import type { RuleEvent, Rule } from '@/lib/api';
@@ -62,8 +63,8 @@ function parseTriggers(raw: string | null): Record<string, string[]> | null {
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline gap-3 py-2.5">
-      <dt className="w-24 shrink-0 text-xs text-muted-foreground">{label}</dt>
+    <div className="py-2.5">
+      <dt className="text-xs text-muted-foreground mb-1">{label}</dt>
       <dd className="text-sm text-foreground font-medium break-all min-w-0">{children}</dd>
     </div>
   );
@@ -164,6 +165,66 @@ function RuleContentDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MarkdownBlock({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        components={{
+          a({ href, children, ...props }) {
+            return (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 dark:text-blue-400 underline underline-offset-2"
+                {...props}
+              >
+                {children}
+              </a>
+            );
+          },
+          code(rawProps) {
+            const { inline, className, children, ...props } = rawProps as {
+              inline?: boolean;
+              className?: string;
+              children?: React.ReactNode;
+              [key: string]: unknown;
+            };
+            const match = /language-(\w+)/.exec(className || '');
+            const codeString = String(children).replace(/\n$/, '');
+            if (!inline) {
+              return (
+                <SyntaxHighlighter
+                  style={oneLight}
+                  language={match?.[1] ?? 'text'}
+                  PreTag="div"
+                  customStyle={{ margin: 0, padding: '0.75rem', borderRadius: '0.5rem' }}
+                >
+                  {codeString}
+                </SyntaxHighlighter>
+              );
+            }
+            return (
+              <code className={`text-xs bg-muted px-1.5 py-0.5 rounded font-mono ${className || ''}`} {...props}>
+                {children}
+              </code>
+            );
+          },
+        }}
+      >
+        {text}
+      </ReactMarkdown>
+    </div>
   );
 }
 
@@ -299,13 +360,13 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
     key: string;
     label: string;
     value: string;
-    kind?: 'text' | 'multiline' | 'prompt' | 'result';
+    kind?: 'text' | 'markdown' | 'prompt' | 'result';
   };
 
   const activityRows: ActivityRow[] = [];
-  if (event.message) activityRows.push({ key: 'message', label: 'Reason', value: event.message, kind: 'multiline' });
+  if (event.message) activityRows.push({ key: 'message', label: 'Reason', value: event.message, kind: 'markdown' });
   if (event.prompt) activityRows.push({ key: 'prompt', label: 'Prompt', value: event.prompt, kind: 'prompt' });
-  if (event.summary) activityRows.push({ key: 'summary', label: 'Summary', value: event.summary, kind: 'multiline' });
+  if (event.summary) activityRows.push({ key: 'summary', label: 'Summary', value: event.summary, kind: 'markdown' });
   if (event.result) activityRows.push({ key: 'result', label: 'Result', value: event.result, kind: 'result' });
   if (event.severity) activityRows.push({ key: 'severity', label: 'Severity', value: event.severity });
   if (event.agent) activityRows.push({ key: 'agent', label: 'Agent', value: event.agent });
@@ -338,8 +399,6 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
         </div>
       )}
 
-      {/* Details section */}
-      <SectionTitle>Details</SectionTitle>
       <dl>
         <Row label="Type">
           <span className={typeConfig?.color ?? 'text-foreground'}>
@@ -393,11 +452,15 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
                     {row.value}
                   </pre>
                 ) : row.kind === 'prompt' ? (
-                  <span className="font-normal text-xs whitespace-pre-wrap bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1 inline-block">
-                    {row.value}
-                  </span>
-                ) : row.kind === 'multiline' ? (
-                  <span className="font-normal whitespace-pre-wrap">{row.value}</span>
+                  <MarkdownBlock
+                    text={row.value}
+                    className="font-normal text-xs bg-purple-50 dark:bg-purple-950/30 rounded px-2 py-1 inline-block w-full prose prose-sm dark:prose-invert max-w-none prose-headings:my-1 prose-p:my-0 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-pre:my-1 prose-pre:bg-transparent prose-pre:p-0 prose-code:before:content-none prose-code:after:content-none"
+                  />
+                ) : row.kind === 'markdown' ? (
+                  <MarkdownBlock
+                    text={row.value}
+                    className="font-normal w-full prose prose-sm dark:prose-invert max-w-none prose-headings:my-1 prose-p:my-0 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-pre:my-1 prose-pre:bg-transparent prose-pre:p-0 prose-code:before:content-none prose-code:after:content-none"
+                  />
                 ) : row.value.length > 120 ? (
                   <span className="font-mono text-xs">{row.value}</span>
                 ) : (
