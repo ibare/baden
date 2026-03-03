@@ -74,7 +74,10 @@ export function AppLayout() {
   const handleWsEvent = useCallback(
     (event: RuleEvent) => {
       if (selectedDate === todayUTC()) {
-        setEvents((prev) => [event, ...prev]);
+        setEvents((prev) => {
+        if (prev.some((e) => e.id === event.id)) return prev;
+        return [event, ...prev];
+      });
       }
       setEventDates((prev) => {
         const d = event.timestamp.slice(0, 10);
