@@ -141,7 +141,7 @@ export const TimelineMinimap = memo(function TimelineMinimap({
 
     const majorTicks = ticks
       .filter((t) => t.isMajor && !t.segmentType)
-      .map((t) => ({ x: t.x * scaleX, label: t.label }))
+      .map((t) => ({ x: t.x * scaleX, label: t.label.replace(/^(\d{2}:\d{2}):\d{2}$/, '$1') }))
       .filter((t) => t.x >= EDGE_MARGIN && t.x <= MINIMAP_WIDTH - EDGE_MARGIN);
 
     // Remove ticks that are too close (left-to-right sweep)
