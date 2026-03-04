@@ -29,6 +29,7 @@ interface TimelineSVGProps {
   onPointerMove: (e: PointerEvent<HTMLDivElement>) => void;
   onPointerUp: () => void;
   isDragging: boolean;
+  now: number;
 }
 
 export const TimelineSVG = memo(function TimelineSVG({
@@ -51,6 +52,7 @@ export const TimelineSVG = memo(function TimelineSVG({
   onPointerMove,
   onPointerUp,
   isDragging,
+  now,
 }: TimelineSVGProps) {
   const [hoveredItem, setHoveredItem] = useState<PlacedItem | null>(null);
 
@@ -119,6 +121,7 @@ export const TimelineSVG = memo(function TimelineSVG({
           rangeStart={rangeStart}
           totalHeight={totalHeight}
           isToday={isToday}
+          now={now}
         />
       </svg>
       {expandLevel === 0 && (

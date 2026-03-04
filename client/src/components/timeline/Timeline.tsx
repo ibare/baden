@@ -98,21 +98,16 @@ export function Timeline({
   const ticks = useTimelineTicks(rangeStart, rangeEnd, ppm, zoomSec, timeMap);
   const connections = useTimelineConnections(placed);
 
-  // Auto-follow: scroll to latest event when new events arrive
+  // Auto-follow: keep NOW line visible by scrolling to current time
   useEffect(() => {
-    if (!autoFollow || !isToday || placed.length === 0 || isDragging) return;
+    if (!autoFollow || !isToday || isDragging) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    let maxRight = 0;
-    for (const item of placed) {
-      const right = item.x + item.width;
-      if (right > maxRight) maxRight = right;
-    }
-
-    const target = maxRight - viewportWidth + 80;
+    const nowX = timeMap.msToX(now);
+    const target = nowX - viewportWidth + 80;
     container.scrollLeft = Math.max(0, target);
-  }, [placed, autoFollow, isToday, isDragging, viewportWidth, scrollContainerRef]);
+  }, [now, timeMap, autoFollow, isToday, isDragging, viewportWidth, scrollContainerRef]);
 
   const scrollToPlacedItem = useCallback(
     (eventId: string) => {
@@ -236,6 +231,7 @@ export function Timeline({
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 isDragging={isDragging}
+                now={now}
               />
             </div>
             <TimelineMinimap

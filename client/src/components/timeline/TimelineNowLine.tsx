@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo } from 'react';
 import type { CompressedTimeMap } from './lib/types';
 
 interface TimelineNowLineProps {
@@ -6,6 +6,7 @@ interface TimelineNowLineProps {
   rangeStart: number;
   totalHeight: number;
   isToday: boolean;
+  now: number;
 }
 
 export const TimelineNowLine = memo(function TimelineNowLine({
@@ -13,15 +14,8 @@ export const TimelineNowLine = memo(function TimelineNowLine({
   rangeStart,
   totalHeight,
   isToday,
+  now,
 }: TimelineNowLineProps) {
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    if (!isToday) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [isToday]);
-
   if (!isToday) return null;
   if (now < rangeStart) return null;
 

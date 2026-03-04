@@ -123,7 +123,8 @@ export function useTimelineLayout(
     // Always extend to at least current time (today) or end of day (past dates)
     const today = new Date().toISOString().slice(0, 10);
     if (selectedDate === today) {
-      const nowWithPadding = Date.now() + 5 * 60_000;
+      const currentNow = nowMs ?? Date.now();
+      const nowWithPadding = currentNow + 5 * 60_000;
       if (nowWithPadding > end) end = nowWithPadding;
     } else {
       const endOfDay = new Date(selectedDate + 'T23:59:59').getTime();
@@ -136,7 +137,7 @@ export function useTimelineLayout(
     }
 
     return { rangeStart: start, rangeEnd: end };
-  }, [allEvents, selectedDate, ppm, viewportWidth]);
+  }, [allEvents, selectedDate, ppm, viewportWidth, nowMs]);
 
   // Stage 3: Build compressed time map
   const timeMap = useMemo(() => {
