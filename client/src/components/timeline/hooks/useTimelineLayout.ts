@@ -36,6 +36,7 @@ export function useTimelineLayout(
   viewportHeight: number,
   resolveAction?: (action: string | null, type: string) => ResolvedAction,
   expandLevel?: ExpandLevel,
+  nowMs?: number,
 ): LayoutResult {
   // Stage 1: Convert RuleEvents → TimelineItems
   // Duration은 글로벌 다음 이벤트까지의 gap으로 추론 (에이전트는 순차 실행이므로 카테고리 무관)
@@ -80,14 +81,21 @@ export function useTimelineLayout(
           endMs = startMs + gap;
         }
       } else {
-        endMs = startMs + DEFAULT_LAST_DURATION_MS;
+        const baseEnd = startMs + DEFAULT_LAST_DURATION_MS;
+        if (nowMs != null && nowMs > baseEnd) {
+          const excess = nowMs - baseEnd;
+          const steps = Math.ceil(excess / 10_000);
+          endMs = baseEnd + steps * 10_000;
+        } else {
+          endMs = baseEnd;
+        }
         truncated = true;
       }
 
       const isInstant = endMs - startMs < INSTANT_THRESHOLD_MS;
       return { id: e.id, event: e, category: cat, startMs, endMs, isInstant, truncated, resolvedIcon, resolvedLabel, resolvedDetail };
     });
-  }, [events, resolveAction]);
+  }, [events, resolveAction, nowMs]);
 
   // Stage 2: Compute time range — ensure it covers at least the viewport width
   const { rangeStart, rangeEnd } = useMemo(() => {

@@ -93,7 +93,7 @@ export function Timeline({
   }, []);
 
   const { placed, lanes, rangeStart, rangeEnd, totalHeight, totalWidth, timeMap } =
-    useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth, viewportHeight, resolveAction, expandLevel);
+    useTimelineLayout(events, allEvents, selectedDate, activeCategories, ppm, viewportWidth, viewportHeight, resolveAction, expandLevel, isToday && autoFollow ? now : undefined);
 
   const ticks = useTimelineTicks(rangeStart, rangeEnd, ppm, zoomSec, timeMap);
   const connections = useTimelineConnections(placed);
