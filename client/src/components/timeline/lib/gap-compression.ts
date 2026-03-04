@@ -146,8 +146,11 @@ export function buildCompressedTimeMap(
   rangeEnd: number,
   ppm: number,
   viewportWidth: number = 0,
+  nowMs?: number,
 ): CompressedTimeMap {
-  const { gaps } = detectGaps(items, rangeStart, rangeEnd);
+  const { gaps: rawGaps } = detectGaps(items, rangeStart, rangeEnd);
+  // Don't compress future gaps (after current time)
+  const gaps = nowMs != null ? rawGaps.filter((g) => g.startMs < nowMs) : rawGaps;
   const longEvents = detectLongEvents(items, ppm, viewportWidth);
 
   // Build unified compressed regions
