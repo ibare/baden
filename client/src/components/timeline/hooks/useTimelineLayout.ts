@@ -46,7 +46,7 @@ export function useTimelineLayout(
     );
 
     // Signal actions: point-in-time markers, always instant
-    const SIGNAL_ACTIONS = new Set(['receive_task', 'task_complete']);
+    const SIGNAL_ACTIONS = new Set(['receive_task', 'task_complete', 'violation_found', 'rule_violation', 'rule_pass', 'check_rule']);
 
     const startTimes = sorted.map((e) => new Date(e.timestamp).getTime());
 

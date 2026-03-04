@@ -16,8 +16,27 @@ interface Rect {
   cy: number;
 }
 
+const FLAG_SIZE = 32;
+const FLAG_ASPECT = 124 / 268;
+const FLAG_POLE_RATIO = 13.77 / 124;
+
 /** Get bounding rect for a placed item (bars vs instant diamond markers) */
 function getItemRect(item: PlacedItem): Rect {
+  // receive_task → flag: anchor at pole bottom
+  if (item.event.action === 'receive_task') {
+    const h = FLAG_SIZE;
+    const w = h * FLAG_ASPECT;
+    const poleX = item.x; // pole aligned to event x
+    const flagY = item.y + BAR_HEIGHT / 2 - h / 2;
+    return {
+      left: poleX - w * FLAG_POLE_RATIO,
+      right: poleX - w * FLAG_POLE_RATIO + w,
+      top: flagY,
+      bottom: flagY + h,
+      cx: poleX,
+      cy: flagY + h,  // exit from pole bottom
+    };
+  }
   if (item.isInstant) {
     const cx = item.x + MARKER_SIZE / 2;
     const cy = item.y + BAR_HEIGHT / 2;
