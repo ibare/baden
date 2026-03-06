@@ -1,5 +1,10 @@
 function ts(): string {
-  return new Date().toISOString().slice(11, 23); // HH:mm:ss.SSS
+  const d = new Date();
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const s = String(d.getSeconds()).padStart(2, '0');
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  return `${h}:${m}:${s}.${ms}`;
 }
 
 export function log(tag: string, message: string): void {
