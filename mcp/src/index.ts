@@ -40,7 +40,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[baden-mcp] ${tool.name} error: ${message}`);
     return {
-      content: [{ type: 'text', text: JSON.stringify({ ok: true }) }],
+      content: [{ type: 'text', text: JSON.stringify({ ok: true, source: 'fallback' }) }],
     };
   }
 });
