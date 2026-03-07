@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baden Weekly Report — 2026 W10 (Mar 3–7)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242833;
+    --border: #2e3341;
+    --text: #e4e6ed;
+    --text-dim: #8b8fa3;
+    --accent: #6c8cff;
+    --exploration: #f59e0b;
+    --planning: #6c8cff;
+    --implementation: #10b981;
+    --rule: #f472b6;
+    --other: #6b7280;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+  }
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    text-align: center;
+  }
+  .kpi-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .kpi-label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    margin-top: 0.25rem;
+  }
+  .kpi-value.green { color: #10b981; }
+  .kpi-value.amber { color: #f59e0b; }
+  .kpi-value.pink { color: #f472b6; }
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .section h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text);
+  }
+  .chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 768px) {
+    .chart-row { grid-template-columns: 1fr; }
+  }
+  .chart-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+  .chart-container h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+  canvas { max-height: 340px; }
+  .legend-row {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+  }
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .insight-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 768px) {
+    .insight-grid { grid-template-columns: 1fr; }
+  }
+  .insight-card {
+    background: var(--surface2);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+  }
+  .insight-card h3 {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+  .insight-card p {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .ratio-bar {
+    display: flex;
+    height: 28px;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 0.75rem 0;
+  }
+  .ratio-bar > div { display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; }
+  .footer {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    margin-top: 2rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Baden Weekly Report</h1>
+<p class="subtitle">2026년 3월 3일 (월) — 3월 7일 (금) &middot; AI 에이전트 활동 분석</p>
+
+<div class="legend-row">
+  <div class="legend-item"><div class="legend-dot" style="background:var(--exploration)"></div>탐색 Exploration</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--planning)"></div>계획 Planning</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--implementation)"></div>구현 Implementation</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--rule)"></div>검증 Rule Compliance</div>
+</div>
+
+<!-- KPI Row -->
+<div class="kpi-row">
+  <div class="kpi">
+    <div class="kpi-value">1,732</div>
+    <div class="kpi-label">총 이벤트</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-value amber">178</div>
+    <div class="kpi-label">완료 태스크</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-value green">93.3%</div>
+    <div class="kpi-label">규칙 준수율</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-value pink">20</div>
+    <div class="kpi-label">규칙 위반 감지</div>
+  </div>
+</div>
+
+<!-- Row 1: Donut + Daily stacked -->
+<div class="chart-row">
+  <div class="chart-container">
+    <h2>카테고리 비중</h2>
+    <canvas id="donut"></canvas>
+  </div>
+  <div class="chart-container">
+    <h2>일별 카테고리 분포</h2>
+    <canvas id="daily"></canvas>
+  </div>
+</div>
+
+<!-- Row 2: Hourly heatmap + Daily total -->
+<div class="chart-row">
+  <div class="chart-container">
+    <h2>시간대별 활동량 (KST)</h2>
+    <canvas id="hourly"></canvas>
+  </div>
+  <div class="chart-container">
+    <h2>일별 이벤트 추이</h2>
+    <canvas id="dailyTotal"></canvas>
+  </div>
+</div>
+
+<!-- Compliance section -->
+<div class="section">
+  <h2>규칙 준수 현황</h2>
+  <div class="ratio-bar">
+    <div style="width:93.3%;background:var(--implementation);color:#fff">277 Pass (93.3%)</div>
+    <div style="width:6.7%;background:#ef4444;color:#fff">20</div>
+  </div>
+  <p style="font-size:0.85rem;color:var(--text-dim)">
+    전체 297건의 규칙 검증 중 277건 통과, 20건 위반 감지.
+    위반 건수가 적어 에이전트가 규칙을 잘 준수하고 있음을 나타냄.
+  </p>
+</div>
+
+<!-- Insights -->
+<div class="section">
+  <h2>인사이트</h2>
+  <div class="insight-grid">
+    <div class="insight-card">
+      <h3>검증이 가장 큰 비중</h3>
+      <p>전체 이벤트의 37.1%가 규칙 검증(rule_pass, check_rule 등)에 해당.
+        AI 에이전트가 코드 작성보다 규칙 확인에 더 많은 시간을 쓰고 있으며,
+        이는 Rule Guard 패턴이 적극적으로 작동하고 있음을 보여줌.</p>
+    </div>
+    <div class="insight-card">
+      <h3>피크 타임: 오전 11시 & 오후 2-4시</h3>
+      <p>11시(410건)와 14-16시(636건)에 가장 많은 활동 발생.
+        오전에 집중 작업이 시작되고, 점심 이후 다시 활발해지는 이중 피크 패턴.
+        18시 이후 급격히 감소.</p>
+    </div>
+    <div class="insight-card">
+      <h3>탐색 → 계획 → 구현 흐름</h3>
+      <p>시간대별로 보면 오전에는 탐색·계획 비중이 높고(10시: 탐색+계획 79%),
+        오후로 갈수록 구현 비중이 증가(16시: 구현 32%).
+        자연스러운 개발 사이클이 관찰됨.</p>
+    </div>
+    <div class="insight-card">
+      <h3>목요일(3/6) 검증 집중일</h3>
+      <p>3/6에 rule_compliance가 243건으로 전체 517건 중 47%를 차지.
+        대규모 리팩토링 또는 린트 정리 작업이 있었던 것으로 추정.
+        같은 날 planning도 155건으로 높음.</p>
+    </div>
+  </div>
+</div>
+
+<div class="footer">Generated by Baden &middot; AI Agent Activity Monitor</div>
+
+<script>
+Chart.defaults.color = '#8b8fa3';
+Chart.defaults.borderColor = '#2e3341';
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, sans-serif';
+
+const COLORS = {
+  exploration: '#f59e0b',
+  planning: '#6c8cff',
+  implementation: '#10b981',
+  rule_compliance: '#f472b6',
+  other: '#6b7280',
+};
+const LABELS = {
+  exploration: '탐색',
+  planning: '계획',
+  implementation: '구현',
+  rule_compliance: '검증',
+};
+
+// 1. Donut
+new Chart(document.getElementById('donut'), {
+  type: 'doughnut',
+  data: {
+    labels: ['탐색 (14.6%)', '계획 (29.7%)', '구현 (18.3%)', '검증 (37.1%)'],
+    datasets: [{
+      data: [252, 515, 317, 642],
+      backgroundColor: [COLORS.exploration, COLORS.planning, COLORS.implementation, COLORS.rule_compliance],
+      borderColor: '#1a1d27',
+      borderWidth: 3,
+    }],
+  },
+  options: {
+    cutout: '55%',
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { padding: 16, usePointStyle: true, pointStyle: 'circle', font: { size: 12 } },
+      },
+    },
+  },
+});
+
+// 2. Daily stacked bar
+const days = ['3/3 (월)', '3/4 (화)', '3/5 (수)', '3/6 (목)', '3/7 (금)'];
+const dailyData = {
+  exploration: [72, 85, 17, 67, 11],
+  planning: [115, 148, 67, 155, 30],
+  implementation: [147, 72, 22, 50, 26],
+  rule_compliance: [175, 74, 5, 243, 145],
+};
+new Chart(document.getElementById('daily'), {
+  type: 'bar',
+  data: {
+    labels: days,
+    datasets: Object.entries(dailyData).map(([key, values]) => ({
+      label: LABELS[key],
+      data: values,
+      backgroundColor: COLORS[key],
+      borderRadius: 2,
+    })),
+  },
+  options: {
+    scales: {
+      x: { stacked: true, grid: { display: false } },
+      y: { stacked: true, grid: { color: '#2e334140' } },
+    },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 11 } },
+      },
+      tooltip: {
+        callbacks: {
+          afterBody(items) {
+            const idx = items[0].dataIndex;
+            const total = Object.values(dailyData).reduce((s, arr) => s + arr[idx], 0);
+            return `총 ${total}건`;
+          },
+        },
+      },
+    },
+  },
+});
+
+// 3. Hourly stacked
+const hours = [8,9,10,11,12,13,14,15,16,17,18,21];
+const hourLabels = hours.map(h => `${h}시`);
+const hourlyData = {
+  exploration:     [2, 3, 11, 63, 32,  9, 32, 42, 48,  4, 1, 5],
+  planning:        [4, 20, 26, 101, 58, 26, 103, 73, 62, 18, 5, 19],
+  implementation:  [1, 4,  9, 68, 16, 12, 39, 55, 92, 20, 1, 0],
+  rule_compliance: [3, 6,  1, 176, 50, 30, 143, 90, 88, 55, 0, 0],
+};
+new Chart(document.getElementById('hourly'), {
+  type: 'bar',
+  data: {
+    labels: hourLabels,
+    datasets: Object.entries(hourlyData).map(([key, values]) => ({
+      label: LABELS[key],
+      data: values,
+      backgroundColor: COLORS[key],
+      borderRadius: 2,
+    })),
+  },
+  options: {
+    scales: {
+      x: { stacked: true, grid: { display: false } },
+      y: { stacked: true, grid: { color: '#2e334140' } },
+    },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { padding: 12, usePointStyle: true, pointStyle: 'circle', font: { size: 11 } },
+      },
+    },
+  },
+});
+
+// 4. Daily total line
+const dailyTotals = [512, 380, 111, 517, 212];
+new Chart(document.getElementById('dailyTotal'), {
+  type: 'line',
+  data: {
+    labels: days,
+    datasets: [{
+      label: '이벤트 수',
+      data: dailyTotals,
+      borderColor: COLORS.planning,
+      backgroundColor: COLORS.planning + '20',
+      fill: true,
+      tension: 0.3,
+      pointRadius: 5,
+      pointBackgroundColor: COLORS.planning,
+    }],
+  },
+  options: {
+    scales: {
+      x: { grid: { display: false } },
+      y: { grid: { color: '#2e334140' }, beginAtZero: true },
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `${ctx.parsed.y}건`,
+        },
+      },
+    },
+  },
+});
+</script>
+
+</body>
+</html>
