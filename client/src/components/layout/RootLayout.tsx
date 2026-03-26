@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import type { Project, ActionPrefix, DetailKeyword } from '@/lib/api';
 import { useProject } from '@/hooks/useProjectContext';
+import { useSelectedProject } from '@/hooks/useSelectedProject';
 import { useActionRegistry } from '@/hooks/useActionRegistry';
 import type { ResolvedAction } from '@/hooks/useActionRegistry';
 import type { EventCategory } from '@/lib/event-types';
@@ -20,18 +21,27 @@ export interface RootOutletContext {
 }
 
 export function RootLayout() {
-  const { projects, selectedProject, setSelectedProject, addProject, updateProject } = useProject();
+  const { projects, addProject, updateProject } = useProject();
+  const selectedProject = useSelectedProject();
+  const navigate = useNavigate();
   const { prefixes, keywords, resolveAction, resolveCategory, resolveIcon, refresh: refreshRegistry } =
     useActionRegistry(selectedProject);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [connected, setConnected] = useState(false);
 
+  const handleSelectProject = useCallback(
+    (id: string) => {
+      navigate(`/projects/${id}/monitor`);
+    },
+    [navigate],
+  );
+
   const handleProjectCreated = useCallback(
     (project: Project) => {
       addProject(project);
-      setSelectedProject(project.id);
+      navigate(`/projects/${project.id}/monitor`);
     },
-    [addProject, setSelectedProject],
+    [addProject, navigate],
   );
 
   const handleProjectUpdated = useCallback(
@@ -61,7 +71,7 @@ export function RootLayout() {
         <Sidebar
           projects={projects}
           selectedProject={selectedProject}
-          onSelectProject={setSelectedProject}
+          onSelectProject={handleSelectProject}
           onProjectCreated={handleProjectCreated}
           onProjectUpdated={handleProjectUpdated}
         />

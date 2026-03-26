@@ -83,7 +83,25 @@ export interface DetailKeyword {
   category: string;
 }
 
+export interface ProjectInsight {
+  project: { id: string; name: string; description: string | null };
+  stats: { totalEvents: number; ruleCount: number; lastActivityAt: string | null };
+  categoryDistribution: { category: string; count: number }[];
+  dailyTrend: { date: string; count: number }[];
+  weeklyTrend: { week: string; date: string; count: number }[];
+}
+
+export interface InsightsResponse {
+  global: {
+    totalEvents: number;
+    totalProjects: number;
+    firstEventAt: string | null;
+  };
+  projects: ProjectInsight[];
+}
+
 export const api = {
+  getInsights: () => request<InsightsResponse>('/insights'),
   getProjects: () => request<Project[]>('/projects'),
   getProject: (id: string) => request<Project & { rules: Rule[] }>(`/projects/${id}`),
   getRules: (projectId: string) => request<Rule[]>(`/projects/${projectId}/rules`),

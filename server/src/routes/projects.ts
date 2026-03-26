@@ -173,6 +173,28 @@ projectsRouter.put('/:id', (req, res) => {
 
     updateProject.run(name, description || null, rulesPath || null, req.params.id);
 
+    // Re-parse rules if rulesPath changed or rules are missing
+    const newPath = rulesPath || null;
+    const pathChanged = newPath !== (existing.rules_path || null);
+    const ruleCount = (db.prepare('SELECT COUNT(*) as cnt FROM rules WHERE project_id = ?').get(req.params.id) as { cnt: number }).cnt;
+    if (newPath && (pathChanged || ruleCount === 0)) {
+      deleteRulesByProject.run(req.params.id);
+      const parsedRules = parseRules(newPath);
+      for (const rule of parsedRules) {
+        insertRule.run(
+          rule.id,
+          req.params.id,
+          rule.category,
+          rule.filePath,
+          rule.description,
+          rule.triggers ? JSON.stringify(rule.triggers) : null,
+          rule.contentHash,
+        );
+      }
+    } else if (pathChanged && !newPath) {
+      deleteRulesByProject.run(req.params.id);
+    }
+
     const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
     res.json(updated);
   } catch (err: unknown) {

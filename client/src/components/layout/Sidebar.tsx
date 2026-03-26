@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { Project } from '@/lib/api';
 import { ProjectDialog } from '@/components/domain/ProjectDialog';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Plus, Monitor, Sliders, PencilSimple } from '@phosphor-icons/react';
+import { FolderOpen, Plus, Monitor, Sliders, PencilSimple, House } from '@phosphor-icons/react';
 
 interface SidebarProps {
   projects: Project[];
@@ -24,17 +24,28 @@ export function Sidebar({
   const navigate = useNavigate();
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
-  const navItems = [
-    { path: '/', label: 'Monitor', icon: Monitor },
-    { path: '/registry', label: 'Action Registry', icon: Sliders },
-  ];
+  const navItems = useMemo(() => {
+    const items = [
+      { path: '/', label: 'Home', icon: House },
+    ];
+    if (selectedProject) {
+      items.push(
+        { path: `/projects/${selectedProject}/monitor`, label: 'Monitor', icon: Monitor },
+        { path: `/projects/${selectedProject}/registry`, label: 'Action Registry', icon: Sliders },
+      );
+    }
+    return items;
+  }, [selectedProject]);
 
   return (
     <aside className="min-w-[14rem] w-56 flex-shrink-0 border-r border-border bg-card/50 flex flex-col h-full">
       {/* Navigation */}
       <nav className="px-2 pt-2 pb-1 space-y-0.5">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive =
+            item.path === '/'
+              ? location.pathname === '/'
+              : location.pathname.startsWith(item.path);
           return (
             <button
               key={item.path}

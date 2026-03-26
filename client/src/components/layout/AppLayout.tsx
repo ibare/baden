@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useNavigate } from 'react-router-dom';
 import { api } from '@/lib/api';
 import type { RuleEvent, Rule } from '@/lib/api';
 import type { EventCategory } from '@/lib/event-types';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useProject } from '@/hooks/useProjectContext';
+import { useSelectedProject } from '@/hooks/useSelectedProject';
 import type { RootOutletContext } from './RootLayout';
 import { ProjectHeader } from '@/components/ProjectHeader';
 import { Timeline } from '@/components/timeline';
@@ -16,7 +17,9 @@ function todayUTC() {
 }
 
 export function AppLayout() {
-  const { projects, selectedProject } = useProject();
+  const { projects } = useProject();
+  const selectedProject = useSelectedProject();
+  const navigate = useNavigate();
   const { resolveAction, resolveCategory, refreshRegistry, setConnected } =
     useOutletContext<RootOutletContext>();
 
@@ -40,6 +43,13 @@ export function AppLayout() {
     () => projects.find((p) => p.id === selectedProject) ?? null,
     [projects, selectedProject],
   );
+
+  // Redirect to home if projectId is invalid (after projects are loaded)
+  useEffect(() => {
+    if (projects.length > 0 && selectedProject && !currentProject) {
+      navigate('/', { replace: true });
+    }
+  }, [projects, selectedProject, currentProject, navigate]);
 
   // Load rules & event dates when project changes
   useEffect(() => {
