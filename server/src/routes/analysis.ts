@@ -42,10 +42,15 @@ analysisRouter.get('/insights', (_req, res) => {
       .all() as { project_id: string; total_events: number; last_activity_at: string | null }[];
     const eventStatsMap = new Map(eventStats.map((r) => [r.project_id, r]));
 
-    // 3. 프로젝트별 규칙 수
+    // 3. 프로젝트별 세부 규칙 수 (MUST/MUST NOT/PREFER bullet 합산)
     const ruleCounts = db
-      .prepare('SELECT project_id, COUNT(*) as rule_count FROM rules GROUP BY project_id')
-      .all() as { project_id: string; rule_count: number }[];
+      .prepare(
+        `SELECT project_id,
+                COUNT(*) as group_count,
+                COALESCE(SUM(item_count), 0) as rule_count
+         FROM rules GROUP BY project_id`,
+      )
+      .all() as { project_id: string; group_count: number; rule_count: number }[];
     const ruleCountMap = new Map(ruleCounts.map((r) => [r.project_id, r.rule_count]));
 
     // 4. 프로젝트별 이벤트 타입 분포

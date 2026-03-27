@@ -14,8 +14,8 @@ const insertProject = db.prepare(`
 `);
 
 const insertRule = db.prepare(`
-  INSERT OR REPLACE INTO rules (id, project_id, category, file_path, description, triggers, content_hash)
-  VALUES (?, ?, ?, ?, ?, ?, ?)
+  INSERT OR REPLACE INTO rules (id, project_id, category, file_path, description, triggers, content_hash, item_count)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `);
 
 const updateProject = db.prepare(`
@@ -55,6 +55,7 @@ projectsRouter.post('/', (req, res) => {
           rule.description,
           rule.triggers ? JSON.stringify(rule.triggers) : null,
           rule.contentHash,
+          rule.itemCount,
         );
       }
     }
@@ -189,6 +190,7 @@ projectsRouter.put('/:id', (req, res) => {
           rule.description,
           rule.triggers ? JSON.stringify(rule.triggers) : null,
           rule.contentHash,
+          rule.itemCount,
         );
       }
     } else if (pathChanged && !newPath) {

@@ -2,6 +2,7 @@ import Database, { type Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
+import crypto from 'crypto';
 import { log } from '../logger.js';
 
 const badenHome = path.join(os.homedir(), '.baden');
@@ -522,6 +523,58 @@ if (brokenFk && brokenFk.sql.includes('_projects_old')) {
     CREATE INDEX IF NOT EXISTS idx_detail_keywords_project ON detail_keywords(project_id);
   `);
   log('DB','Migration complete: FK references repaired');
+}
+
+// Migration: add item_count column to rules and backfill from files
+const hasItemCount = db.prepare(
+  "SELECT COUNT(*) as cnt FROM pragma_table_info('rules') WHERE name='item_count'"
+).get() as { cnt: number };
+if (hasItemCount.cnt === 0) {
+  log('DB','Migrating: adding item_count column to rules...');
+  db.exec(`ALTER TABLE rules ADD COLUMN item_count INTEGER NOT NULL DEFAULT 0`);
+  log('DB','Migration complete: item_count column added');
+}
+
+// Backfill item_count for existing rules where it's 0
+const needsBackfill = db.prepare(
+  "SELECT COUNT(*) as cnt FROM rules WHERE item_count = 0"
+).get() as { cnt: number };
+if (needsBackfill.cnt > 0) {
+  log('DB', `Backfilling item_count for ${needsBackfill.cnt} rules...`);
+
+  function countItems(content: string): number {
+    const lines = content.split('\n');
+    let count = 0;
+    let inSection = false;
+    let inCode = false;
+    for (const line of lines) {
+      if (line.startsWith('```')) { inCode = !inCode; continue; }
+      if (inCode) continue;
+      if (/^##\s/.test(line)) { inSection = /^##\s+(MUST|PREFER)\b/i.test(line); continue; }
+      if (inSection && /^- /.test(line)) count++;
+    }
+    return count;
+  }
+
+  const rows = db.prepare(
+    `SELECT r.id, r.project_id, r.file_path, p.rules_path
+     FROM rules r JOIN projects p ON r.project_id = p.id
+     WHERE r.item_count = 0 AND p.rules_path IS NOT NULL`
+  ).all() as { id: string; project_id: string; file_path: string; rules_path: string }[];
+
+  const updateItemCount = db.prepare('UPDATE rules SET item_count = ? WHERE id = ? AND project_id = ?');
+  let filled = 0;
+  for (const row of rows) {
+    const fullPath = path.resolve(row.rules_path, row.file_path);
+    if (!fs.existsSync(fullPath)) continue;
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    const count = countItems(content);
+    if (count > 0) {
+      updateItemCount.run(count, row.id, row.project_id);
+      filled++;
+    }
+  }
+  log('DB', `Backfill complete: updated ${filled} rules with item_count`);
 }
 
 db.pragma('foreign_keys = ON');

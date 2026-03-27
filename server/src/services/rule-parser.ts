@@ -13,6 +13,33 @@ function idFromFilename(filePath: string): string {
   return path.basename(filePath, '.md').replace(/\s+/g, '-').toLowerCase();
 }
 
+/** Count bullet items under ## MUST / ## MUST NOT / ## PREFER headings */
+function countRuleItems(content: string): number {
+  const lines = content.split('\n');
+  let count = 0;
+  let inRuleSection = false;
+  let inCodeBlock = false;
+
+  for (const line of lines) {
+    if (line.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    if (inCodeBlock) continue;
+
+    if (/^##\s/.test(line)) {
+      inRuleSection = /^##\s+(MUST|PREFER)\b/i.test(line);
+      continue;
+    }
+
+    if (inRuleSection && /^- /.test(line)) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
 function parseEntry(
   entry: IndexYamlEntry,
   category: RuleCategory,
@@ -36,6 +63,7 @@ function parseEntry(
     description: entry.description || null,
     triggers: entry.triggers || null,
     contentHash,
+    itemCount: countRuleItems(content),
   };
 }
 

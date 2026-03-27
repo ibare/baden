@@ -143,6 +143,7 @@ export interface ParsedRule {
     events?: string[];
   } | null;
   contentHash: string;
+  itemCount: number;
 }
 
 export interface IndexYamlEntry {
