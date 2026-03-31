@@ -21,7 +21,7 @@ export interface RootOutletContext {
 }
 
 export function RootLayout() {
-  const { projects, addProject, updateProject } = useProject();
+  const { projects, addProject, updateProject, removeProject } = useProject();
   const selectedProject = useSelectedProject();
   const navigate = useNavigate();
   const { prefixes, keywords, resolveAction, resolveCategory, resolveIcon, refresh: refreshRegistry } =
@@ -51,6 +51,16 @@ export function RootLayout() {
     [updateProject],
   );
 
+  const handleProjectDeleted = useCallback(
+    (id: string) => {
+      removeProject(id);
+      if (selectedProject === id) {
+        navigate('/');
+      }
+    },
+    [removeProject, selectedProject, navigate],
+  );
+
   const outletContext: RootOutletContext = {
     prefixes,
     keywords,
@@ -74,6 +84,7 @@ export function RootLayout() {
           onSelectProject={handleSelectProject}
           onProjectCreated={handleProjectCreated}
           onProjectUpdated={handleProjectUpdated}
+          onProjectDeleted={handleProjectDeleted}
         />
       </div>
 

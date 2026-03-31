@@ -122,6 +122,9 @@ export const api = {
   updateProject: (id: string, data: { name: string; description?: string; rulesPath?: string }) =>
     request<Project>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
+  deleteProject: (id: string) =>
+    request<{ ok: boolean }>(`/projects/${id}`, { method: 'DELETE' }),
+
   // Action Registry
   getActionRegistry: (projectId: string) =>
     request<ActionRegistryEntry[]>(`/projects/${projectId}/action-registry`),

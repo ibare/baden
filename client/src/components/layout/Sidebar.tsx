@@ -1,9 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { Project } from '@/lib/api';
+import { api } from '@/lib/api';
 import { ProjectDialog } from '@/components/domain/ProjectDialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Plus, Monitor, Sliders, PencilSimple, House } from '@phosphor-icons/react';
+import { FolderOpen, Plus, Monitor, Sliders, PencilSimple, House, Trash } from '@phosphor-icons/react';
 
 interface SidebarProps {
   projects: Project[];
@@ -11,6 +22,7 @@ interface SidebarProps {
   onSelectProject: (id: string) => void;
   onProjectCreated: (project: Project) => void;
   onProjectUpdated: (project: Project) => void;
+  onProjectDeleted: (id: string) => void;
 }
 
 export function Sidebar({
@@ -19,10 +31,27 @@ export function Sidebar({
   onSelectProject,
   onProjectCreated,
   onProjectUpdated,
+  onProjectDeleted,
 }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!deletingProject) return;
+    setDeleting(true);
+    try {
+      await api.deleteProject(deletingProject.id);
+      onProjectDeleted(deletingProject.id);
+      setDeletingProject(null);
+    } catch (err) {
+      console.error('Failed to delete project:', err);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const navItems = useMemo(() => {
     const items = [
@@ -85,16 +114,28 @@ export function Sidebar({
                 <FolderOpen size={16} className="flex-shrink-0" />
                 <span className="truncate">{p.name}</span>
               </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingProject(p);
-                }}
-                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 hover:bg-muted transition-opacity text-muted-foreground hover:text-foreground"
-                title="Edit project"
-              >
-                <PencilSimple size={14} />
-              </button>
+              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingProject(p);
+                  }}
+                  className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                  title="Edit project"
+                >
+                  <PencilSimple size={14} />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeletingProject(p);
+                  }}
+                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                  title="Delete project"
+                >
+                  <Trash size={14} />
+                </button>
+              </div>
             </div>
           );
         })}
@@ -127,6 +168,28 @@ export function Sidebar({
           }}
         />
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deletingProject} onOpenChange={(open) => { if (!open) setDeletingProject(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project</AlertDialogTitle>
+            <AlertDialogDescription>
+              Project "{deletingProject?.name}" and all associated data (events, rules, etc.) will be permanently deleted. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   );
 }

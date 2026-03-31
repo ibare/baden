@@ -7,6 +7,7 @@ interface ProjectContextValue {
   projects: Project[];
   addProject: (project: Project) => void;
   updateProject: (project: Project) => void;
+  removeProject: (id: string) => void;
 }
 
 const ProjectContext = createContext<ProjectContextValue | null>(null);
@@ -26,8 +27,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setProjects((prev) => prev.map((p) => (p.id === project.id ? project : p)));
   }, []);
 
+  const removeProject = useCallback((id: string) => {
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+  }, []);
+
   return (
-    <ProjectContext.Provider value={{ projects, addProject, updateProject }}>
+    <ProjectContext.Provider value={{ projects, addProject, updateProject, removeProject }}>
       {children}
     </ProjectContext.Provider>
   );

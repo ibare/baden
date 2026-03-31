@@ -4,6 +4,7 @@ import { Router } from 'express';
 import { nanoid } from 'nanoid';
 import db from '../db/connection.js';
 import { parseRules } from '../services/rule-parser.js';
+import { invalidatePrefixCache, invalidateKeywordCache, invalidateCache as invalidateRegistryCache } from '../services/action-registry.js';
 import type { Project, Rule } from '../types.js';
 
 export const projectsRouter = Router();
@@ -199,6 +200,38 @@ projectsRouter.put('/:id', (req, res) => {
 
     const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
     res.json(updated);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// DELETE /api/projects/:id - 프로젝트 삭제
+projectsRouter.delete('/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare('SELECT * FROM projects WHERE id = ?').get(id) as Project | undefined;
+    if (!existing) {
+      res.status(404).json({ error: 'Project not found' });
+      return;
+    }
+
+    const deleteAll = db.transaction(() => {
+      db.prepare('DELETE FROM events WHERE project_id = ?').run(id);
+      db.prepare('DELETE FROM action_registry WHERE project_id = ?').run(id);
+      db.prepare('DELETE FROM action_prefixes WHERE project_id = ?').run(id);
+      db.prepare('DELETE FROM detail_keywords WHERE project_id = ?').run(id);
+      deleteRulesByProject.run(id);
+      db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+    });
+    deleteAll();
+
+    // Invalidate in-memory caches
+    invalidatePrefixCache(id);
+    invalidateKeywordCache(id);
+    invalidateRegistryCache(id);
+
+    res.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: message });
