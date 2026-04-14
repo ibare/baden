@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import type { RuleEvent } from '@/lib/api';
+import { notifyTaskComplete } from './useTaskNotification';
 
 interface UseWebSocketOptions {
   projectId?: string;
@@ -37,6 +38,7 @@ export function useWebSocket({ projectId, onEvent, onRegistryUpdate }: UseWebSoc
           const msg = JSON.parse(e.data);
           if (msg.type === 'event' && msg.data) {
             onEventRef.current?.(msg.data);
+            notifyTaskComplete(msg.data);
           } else if (msg.type === 'registry_update') {
             onRegistryUpdateRef.current?.();
           }

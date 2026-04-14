@@ -4,6 +4,7 @@ import type { Project, ActionPrefix, DetailKeyword } from '@/lib/api';
 import { useProject } from '@/hooks/useProjectContext';
 import { useSelectedProject } from '@/hooks/useSelectedProject';
 import { useActionRegistry } from '@/hooks/useActionRegistry';
+import { useTaskNotification } from '@/hooks/useTaskNotification';
 import type { ResolvedAction } from '@/hooks/useActionRegistry';
 import type { EventCategory } from '@/lib/event-types';
 import { TopBar } from './TopBar';
@@ -28,6 +29,7 @@ export function RootLayout() {
     useActionRegistry(selectedProject);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [connected, setConnected] = useState(false);
+  useTaskNotification(projects);
 
   const handleSelectProject = useCallback(
     (id: string) => {

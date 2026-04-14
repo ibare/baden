@@ -65,7 +65,15 @@ const WORD_TO_TYPE: Record<string, EventType> = {
 /** run은 skip word — 다음 단어로 위임 */
 const SKIP_WORDS = new Set(['run']);
 
+/** action이 그대로 EventType인 경우 (분해 없이 직접 매핑) */
+const DIRECT_EVENT_TYPES = new Set<EventType>(['task_complete']);
+
 function inferEventType(action: string, _phase?: string, ruleId?: string): EventType {
+  // action이 그 자체로 EventType이면 그대로 사용
+  if (DIRECT_EVENT_TYPES.has(action as EventType)) {
+    return action as EventType;
+  }
+
   // 정확히 알려진 EventType이면 그대로 사용
   if (action in WORD_TO_TYPE && !action.includes('_')) {
     return WORD_TO_TYPE[action];
