@@ -1,0 +1,66 @@
+# rules/INDEX.yaml
+# Rule Registry — 트리거 조건에 따라 로드할 규칙 결정
+#
+# Trigger types:
+#   paths:    파일 경로 glob 패턴
+#   patterns: 코드에서 발견되는 문자열/정규식
+#   imports:  import/include/require 문에 포함된 모듈명
+#   events:   작업 유형 (create-file, rename-file 등)
+
+# ─────────────────────────────────────
+# Always loaded
+# ─────────────────────────────────────
+always:
+  - file: principles.md
+    description: 모든 코드에 적용되는 핵심 원칙 (에이전트 차단 금지, 단방향 의존성, 싱글턴, 타입 계약, 최소 변경, 분류 일관성)
+
+# ─────────────────────────────────────
+# Concerns (Cross-cutting)
+# ─────────────────────────────────────
+concerns:
+  - id: C1
+    file: concerns/C1-error-resilience.md
+    description: 수집 경로 에러 처리 — 에이전트 차단 금지
+    triggers:
+      paths: ["server/src/routes/**", "server/src/services/**", "mcp/src/**"]
+      patterns: ["try", "catch", "res.status", "postQuery"]
+
+  - id: C2
+    file: concerns/C2-singleton-resources.md
+    description: DB 연결, prepared statements, 캐시, WebSocket 풀
+    triggers:
+      paths: ["server/src/db/**", "server/src/ws.ts", "server/src/services/**"]
+      patterns: ["db.prepare", "new Database", "invalidateCache"]
+      imports: ["better-sqlite3", "../db/connection", "../ws"]
+
+  - id: C3
+    file: concerns/C3-dependency-direction.md
+    description: 패키지 내 import 방향 강제
+    triggers:
+      events: [create-file, rename-file]
+      patterns: ["import", "from '", "from \""]
+
+  - id: C4
+    file: concerns/C4-data-mapping.md
+    description: EventType/EventCategory 매핑 동기화
+    triggers:
+      paths: ["server/src/types.ts", "server/src/routes/query.ts", "server/src/routes/analysis.ts", "client/src/lib/event-types.ts", "client/src/components/timeline/lib/constants.ts"]
+      patterns: ["EventType", "EventCategory", "EVENT_CATEGORY_MAP", "TYPE_TO_CATEGORY", "WORD_TO_TYPE", "CATEGORY_ORDER"]
+
+# ─────────────────────────────────────
+# Specifics (Domain-specific)
+# ─────────────────────────────────────
+specifics:
+  - id: S-timeline
+    file: specifics/S-timeline.md
+    description: 타임라인 시각화 — 레이아웃 파이프라인, GAP 압축, 좌표 시스템
+    triggers:
+      paths: ["client/src/components/timeline/**"]
+      imports: ["./lib/types", "./lib/constants", "./lib/gap-compression", "./lib/algorithms"]
+
+  - id: S-query-protocol
+    file: specifics/S-query-protocol.md
+    description: 쿼리 프로토콜 — 액션 분류, MCP 도구, word 분해
+    triggers:
+      paths: ["server/src/routes/query.ts", "mcp/src/tools.ts", "mcp/src/client.ts"]
+      imports: ["../services/event-processor", "../db/connection", "./client"]

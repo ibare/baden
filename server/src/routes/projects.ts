@@ -265,6 +265,7 @@ projectsRouter.put('/:id/sync', (req, res) => {
         rule.description,
         rule.triggers ? JSON.stringify(rule.triggers) : null,
         rule.contentHash,
+        rule.itemCount,
       );
     }
 

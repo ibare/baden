@@ -20,7 +20,8 @@ dist-ssr/
 npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
-
+tasks/
+ 
 # OS
 .DS_Store
 Thumbs.db
