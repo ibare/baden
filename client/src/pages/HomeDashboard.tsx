@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '@/lib/api';
-import type { InsightsResponse } from '@/lib/api';
+import type { InsightsResponse, DeepComparisonResponse } from '@/lib/api';
 import { useProject } from '@/hooks/useProjectContext';
 import { useLiveFeed } from '@/hooks/useLiveFeed';
 import { ProjectDialog } from '@/components/domain/ProjectDialog';
 import { GlobalStats } from '@/components/dashboard/GlobalStats';
 import { ProjectInsightCard } from '@/components/dashboard/ProjectInsightCard';
+import { CrossProjectInsights } from '@/components/dashboard/CrossProjectInsights';
 import { LiveFeed } from '@/components/dashboard/LiveFeed';
 import { Plus } from '@phosphor-icons/react';
 
@@ -29,6 +30,7 @@ export function HomeDashboard() {
   const { projects, addProject } = useProject();
   const { feedItems, connected } = useLiveFeed();
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
+  const [deepComparison, setDeepComparison] = useState<DeepComparisonResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [feedWidth, setFeedWidth] = useState(loadFeedWidth);
   const [resizing, setResizing] = useState(false);
@@ -62,9 +64,14 @@ export function HomeDashboard() {
 
   useEffect(() => {
     setLoading(true);
-    api
-      .getInsights()
-      .then(setInsights)
+    Promise.all([
+      api.getInsights(),
+      api.getAnalyticsCompareDeep().catch(() => null),
+    ])
+      .then(([ins, deep]) => {
+        setInsights(ins);
+        setDeepComparison(deep);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -91,6 +98,11 @@ export function HomeDashboard() {
     );
   }
 
+  // compare/deep에서 projectId → DeepProjectData 매핑
+  const deepMap = new Map(
+    deepComparison?.projects.map((p) => [p.projectId, p]) ?? [],
+  );
+
   return (
     <div className={`flex-1 flex min-h-0 ${resizing ? 'select-none' : ''}`}>
       {/* Main content */}
@@ -103,17 +115,26 @@ export function HomeDashboard() {
           </div>
 
           {/* Global stats + Activity Heatmap */}
-          <GlobalStats insights={insights} />
+          <GlobalStats insights={insights} deepComparison={deepComparison} />
 
           {/* Project cards */}
           <div>
             <h2 className="text-sm font-semibold mb-3">Projects</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {insights.projects.map((insight) => (
-                <ProjectInsightCard key={insight.project.id} insight={insight} />
+                <ProjectInsightCard
+                  key={insight.project.id}
+                  insight={insight}
+                  deep={deepMap.get(insight.project.id) ?? null}
+                />
               ))}
             </div>
           </div>
+
+          {/* Cross-project insights */}
+          {deepComparison && deepComparison.projects.length > 1 && (
+            <CrossProjectInsights data={deepComparison} />
+          )}
         </div>
       </div>
 
