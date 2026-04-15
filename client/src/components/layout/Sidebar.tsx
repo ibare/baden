@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Plus, Monitor, Sliders, PencilSimple, House, Trash } from '@phosphor-icons/react';
+import { FolderOpen, Plus, Monitor, Sliders, PencilSimple, House, Trash, ChartLine, ArrowsLeftRight } from '@phosphor-icons/react';
 
 interface SidebarProps {
   projects: Project[];
@@ -56,10 +56,12 @@ export function Sidebar({
   const navItems = useMemo(() => {
     const items = [
       { path: '/', label: 'Home', icon: House },
+      { path: '/compare', label: 'Compare', icon: ArrowsLeftRight },
     ];
     if (selectedProject) {
       items.push(
         { path: `/projects/${selectedProject}/monitor`, label: 'Monitor', icon: Monitor },
+        { path: `/projects/${selectedProject}/analysis`, label: 'Analysis', icon: ChartLine },
         { path: `/projects/${selectedProject}/registry`, label: 'Action Registry', icon: Sliders },
       );
     }

@@ -577,6 +577,12 @@ if (needsBackfill.cnt > 0) {
   log('DB', `Backfill complete: updated ${filled} rules with item_count`);
 }
 
+// Analytics composite indexes for Phase 2 analysis queries
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_events_project_type ON events(project_id, type);
+  CREATE INDEX IF NOT EXISTS idx_events_project_rule_type ON events(project_id, rule_id, type);
+`);
+
 db.pragma('foreign_keys = ON');
 
 const _selectProjectIdByName = db.prepare<

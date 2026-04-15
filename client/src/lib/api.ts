@@ -100,6 +100,124 @@ export interface InsightsResponse {
   projects: ProjectInsight[];
 }
 
+// ─── Analytics Types ────────────────────────────────────
+
+export type RuleQualityLabel = 'healthy' | 'dormant' | 'ineffective' | 'over_triggered';
+
+export interface RuleEffectivenessItem {
+  ruleId: string;
+  description: string | null;
+  category: string;
+  itemCount: number;
+  matchCount: number;
+  violationCount: number;
+  fixCount: number;
+  violationRate: number;
+  fixRate: number;
+  avgFixTimeMs: number | null;
+  trend: { week: string; violations: number; matches: number; fixes: number }[];
+  repeatedViolations: number;
+}
+
+export interface RuleEffectivenessResponse {
+  rules: RuleEffectivenessItem[];
+}
+
+export interface RuleQualityItem {
+  ruleId: string;
+  description: string | null;
+  category: string;
+  itemCount: number;
+  quality: RuleQualityLabel;
+  reason: string;
+  matchCount: number;
+  violationCount: number;
+  fixCount: number;
+  lastMatchAt: string | null;
+  lastViolationAt: string | null;
+  avgFixTimeMs: number | null;
+}
+
+export interface RuleQualityResponse {
+  rules: RuleQualityItem[];
+  summary: Record<RuleQualityLabel, number>;
+}
+
+export interface AgentEfficiencyResponse {
+  summary: {
+    totalTasks: number;
+    totalViolations: number;
+    totalFixes: number;
+    violationRate: number;
+    fixSuccessRate: number;
+    avgFixTimeMs: number | null;
+  };
+  taskBreakdown: {
+    taskId: string;
+    startedAt: string;
+    completedAt: string | null;
+    eventCount: number;
+    violationCount: number;
+    fixCount: number;
+    fixRate: number;
+  }[];
+  trend: {
+    week: string;
+    tasks: number;
+    violations: number;
+    fixes: number;
+  }[];
+}
+
+export interface RuleDetailResponse {
+  rule: {
+    id: string;
+    category: string;
+    filePath: string;
+    description: string | null;
+    triggers: Record<string, unknown> | null;
+    itemCount: number;
+  };
+  stats: {
+    matchCount: number;
+    violationCount: number;
+    fixCount: number;
+    avgFixTimeMs: number | null;
+    quality: RuleQualityLabel;
+    reason: string;
+  };
+  violations: {
+    id: string;
+    timestamp: string;
+    file: string | null;
+    message: string | null;
+    severity: string | null;
+    taskId: string | null;
+    fixed: boolean;
+    fixTimeMs: number | null;
+  }[];
+  trend: { week: string; matches: number; violations: number; fixes: number }[];
+  topFiles: { file: string; violation_count: number; last_at: string }[];
+}
+
+export interface ProjectComparisonItem {
+  projectId: string;
+  projectName: string;
+  totalEvents: number;
+  ruleCount: number;
+  itemCount: number;
+  categoryDistribution: Record<string, number>;
+  complianceRate: number;
+  ruleRefIntensity: number;
+  fixRate: number;
+  avgFixTimeMs: number | null;
+  maturityScore: number;
+}
+
+export interface ProjectComparisonResponse {
+  projects: ProjectComparisonItem[];
+}
+
 export const api = {
   getInsights: () => request<InsightsResponse>('/insights'),
   getProjects: () => request<Project[]>('/projects'),
@@ -193,4 +311,29 @@ export const api = {
 
   deleteKeyword: (projectId: string, id: number) =>
     request<{ ok: boolean }>(`/projects/${projectId}/action-registry/keywords/${id}`, { method: 'DELETE' }),
+
+  // Analytics
+  getAnalyticsRuleEffectiveness: (projectId: string, params?: { ruleId?: string; days?: number }) => {
+    const qs = new URLSearchParams({ projectId });
+    if (params?.ruleId) qs.set('ruleId', params.ruleId);
+    if (params?.days) qs.set('days', String(params.days));
+    return request<RuleEffectivenessResponse>(`/analytics/rules/effectiveness?${qs}`);
+  },
+
+  getAnalyticsRuleQuality: (projectId: string) =>
+    request<RuleQualityResponse>(`/analytics/rules/quality?projectId=${projectId}`),
+
+  getAnalyticsAgentEfficiency: (projectId: string, params?: { days?: number }) => {
+    const qs = new URLSearchParams({ projectId });
+    if (params?.days) qs.set('days', String(params.days));
+    return request<AgentEfficiencyResponse>(`/analytics/agent/efficiency?${qs}`);
+  },
+
+  getAnalyticsRuleDetail: (projectId: string, ruleId: string) =>
+    request<RuleDetailResponse>(`/analytics/rules/${ruleId}?projectId=${projectId}`),
+
+  getAnalyticsCompare: (projectIds?: string[]) => {
+    const qs = projectIds ? `?projectIds=${projectIds.join(',')}` : '';
+    return request<ProjectComparisonResponse>(`/analytics/compare${qs}`);
+  },
 };

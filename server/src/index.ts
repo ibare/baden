@@ -13,6 +13,7 @@ import { eventsRouter } from './routes/events.js';
 import { queryRouter } from './routes/query.js';
 import { actionRegistryRouter } from './routes/action-registry.js';
 import { analysisRouter } from './routes/analysis.js';
+import { analyticsRouter } from './routes/analytics.js';
 
 const PORT = Number(process.env.PORT) || 3800;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,6 +42,7 @@ app.use('/api/events', eventsRouter);
 app.use('/api/query', queryRouter);
 app.use('/api/projects/:projectId/action-registry', actionRegistryRouter);
 app.use('/api', analysisRouter);
+app.use('/api/analytics', analyticsRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => {
