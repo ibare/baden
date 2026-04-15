@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { useState, useCallback, useMemo } from 'react';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import type { Project, ActionPrefix, DetailKeyword } from '@/lib/api';
 import { useProject } from '@/hooks/useProjectContext';
 import { useSelectedProject } from '@/hooks/useSelectedProject';
@@ -25,25 +25,37 @@ export function RootLayout() {
   const { projects, addProject, updateProject, removeProject } = useProject();
   const selectedProject = useSelectedProject();
   const navigate = useNavigate();
+  const location = useLocation();
   const { prefixes, keywords, resolveAction, resolveCategory, resolveIcon, refresh: refreshRegistry } =
     useActionRegistry(selectedProject);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [connected, setConnected] = useState(false);
   useTaskNotification(projects);
 
+  const currentProject = useMemo(
+    () => projects.find((p) => p.id === selectedProject) ?? null,
+    [projects, selectedProject],
+  );
+
+  // 현재 경로에서 뷰 세그먼트 추출 (monitor/analysis/registry), 없으면 monitor
+  const currentView = useMemo(() => {
+    const match = location.pathname.match(/\/projects\/[^/]+\/(monitor|analysis|registry)/);
+    return match ? match[1] : 'monitor';
+  }, [location.pathname]);
+
   const handleSelectProject = useCallback(
     (id: string) => {
-      navigate(`/projects/${id}/monitor`);
+      navigate(`/projects/${id}/${currentView}`);
     },
-    [navigate],
+    [navigate, currentView],
   );
 
   const handleProjectCreated = useCallback(
     (project: Project) => {
       addProject(project);
-      navigate(`/projects/${project.id}/monitor`);
+      navigate(`/projects/${project.id}/${currentView}`);
     },
-    [addProject, navigate],
+    [addProject, navigate, currentView],
   );
 
   const handleProjectUpdated = useCallback(
@@ -76,13 +88,14 @@ export function RootLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
+      {/* Sidebar: 접힘 시 w-12 (아이콘 모드), 펼침 시 w-56 */}
       <div
-        className={`${sidebarOpen ? 'w-56' : 'w-0'} transition-[width] duration-200 overflow-hidden flex-shrink-0`}
+        className={`${sidebarOpen ? 'w-56' : 'w-12'} transition-[width] duration-200 flex-shrink-0`}
       >
         <Sidebar
           projects={projects}
           selectedProject={selectedProject}
+          collapsed={!sidebarOpen}
           onSelectProject={handleSelectProject}
           onProjectCreated={handleProjectCreated}
           onProjectUpdated={handleProjectUpdated}
@@ -96,6 +109,7 @@ export function RootLayout() {
           connected={connected}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((v) => !v)}
+          currentProject={currentProject}
         />
         <div className="flex-1 min-h-0 flex min-w-0">
           <Outlet context={outletContext} />

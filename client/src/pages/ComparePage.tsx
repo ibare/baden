@@ -73,7 +73,7 @@ export function ComparePage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-[1200px] mx-auto">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-[1200px] mx-auto">
       {/* Header + Project Filter */}
       <div>
         <h1 className="text-xl font-semibold mb-3">Project Comparison</h1>

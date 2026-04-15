@@ -7,7 +7,6 @@ import { useWebSocket } from '@/hooks/useWebSocket';
 import { useProject } from '@/hooks/useProjectContext';
 import { useSelectedProject } from '@/hooks/useSelectedProject';
 import type { RootOutletContext } from './RootLayout';
-import { ProjectHeader } from '@/components/ProjectHeader';
 import { Timeline } from '@/components/timeline';
 import { EventDrawer } from '@/components/EventDrawer';
 
@@ -39,17 +38,12 @@ export function AppLayout() {
   const [drawerPinned, setDrawerPinned] = useState(false);
   const [drawerWidth, setDrawerWidth] = useState(384);
 
-  const currentProject = useMemo(
-    () => projects.find((p) => p.id === selectedProject) ?? null,
-    [projects, selectedProject],
-  );
-
   // Redirect to home if projectId is invalid (after projects are loaded)
   useEffect(() => {
-    if (projects.length > 0 && selectedProject && !currentProject) {
+    if (projects.length > 0 && selectedProject && !projects.some((p) => p.id === selectedProject)) {
       navigate('/', { replace: true });
     }
-  }, [projects, selectedProject, currentProject, navigate]);
+  }, [projects, selectedProject, navigate]);
 
   // Load rules & event dates when project changes
   useEffect(() => {
@@ -153,8 +147,6 @@ export function AppLayout() {
     <div className="flex-1 flex min-w-0 min-h-0">
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <ProjectHeader project={currentProject} />
-
         {selectedProject && (
           <div className="flex-1 min-h-0 overflow-hidden">
             <Timeline

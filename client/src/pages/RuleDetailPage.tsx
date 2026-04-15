@@ -47,7 +47,7 @@ export function RuleDetailPage() {
   const { rule, stats, violations, trend, topFiles } = data;
 
   return (
-    <div className="p-6 space-y-6 max-w-[1200px] mx-auto">
+    <div className="flex-1 overflow-y-auto p-6 space-y-6 max-w-[1200px] mx-auto">
       {/* Header */}
       <div>
         <button
