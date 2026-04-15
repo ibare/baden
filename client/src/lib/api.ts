@@ -218,6 +218,90 @@ export interface ProjectComparisonResponse {
   projects: ProjectComparisonItem[];
 }
 
+// ─── Insights Types ─────────────────────────────────────
+
+export type Phase = 'receive' | 'plan' | 'explore' | 'rule_check' | 'implement' | 'verify' | 'complete' | 'other';
+
+export interface ViolationCluster {
+  rule: string;
+  count: number;
+  examples: string[];
+}
+
+export interface HotspotFile {
+  file: string;
+  totalViolations: number;
+  rules: Record<string, number>;
+}
+
+export interface RuleCoOccurrence {
+  ruleA: string;
+  ruleB: string;
+  count: number;
+}
+
+export interface ViolationStory {
+  taskId: string;
+  durationSec: number;
+  steps: {
+    action: string;
+    phase: Phase;
+    ruleId: string | null;
+    kind: 'match' | 'violation' | 'fix' | null;
+    timestamp: string;
+  }[];
+  violationCount: number;
+  resolved: boolean;
+}
+
+export interface BehaviorFlowItem {
+  phase: Phase;
+  totalEvents: number;
+  avgPerTask: number;
+}
+
+export interface DurationBucket {
+  bucket: string;
+  count: number;
+}
+
+export interface PhaseTimeItem {
+  phase: Phase;
+  timeMs: number;
+  percentage: number;
+}
+
+export interface HourlyItem {
+  hour: number;
+  count: number;
+}
+
+export interface ComplexityItem {
+  taskId: string;
+  events: number;
+  files: number;
+  durationMin: number;
+}
+
+export interface DailyProductivityItem {
+  date: string;
+  tasks: number;
+  events: number;
+}
+
+export interface AnalyticsInsightsResponse {
+  violationClusters: ViolationCluster[];
+  hotspotFiles: HotspotFile[];
+  ruleCoOccurrence: RuleCoOccurrence[];
+  violationStories: ViolationStory[];
+  behaviorFlow: BehaviorFlowItem[];
+  durationDistribution: DurationBucket[];
+  phaseTimeDistribution: PhaseTimeItem[];
+  hourlyDistribution: HourlyItem[];
+  complexityData: ComplexityItem[];
+  dailyProductivity: DailyProductivityItem[];
+}
+
 export const api = {
   getInsights: () => request<InsightsResponse>('/insights'),
   getProjects: () => request<Project[]>('/projects'),
@@ -335,5 +419,11 @@ export const api = {
   getAnalyticsCompare: (projectIds?: string[]) => {
     const qs = projectIds ? `?projectIds=${projectIds.join(',')}` : '';
     return request<ProjectComparisonResponse>(`/analytics/compare${qs}`);
+  },
+
+  getAnalyticsInsights: (projectId: string, params?: { days?: number }) => {
+    const qs = new URLSearchParams({ projectId });
+    if (params?.days) qs.set('days', String(params.days));
+    return request<AnalyticsInsightsResponse>(`/analytics/insights?${qs}`);
   },
 };

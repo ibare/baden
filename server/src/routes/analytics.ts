@@ -5,27 +5,14 @@ export const analyticsRouter = Router();
 
 // ─── 공통 타입 ─────────────────────────────────────────
 
-interface TypeCount {
+interface RuleEventRow {
   rule_id: string;
+  action: string;
   type: string;
-  count: number;
-}
-
-interface AvgFixRow {
-  rule_id: string;
-  avg_fix_ms: number;
-}
-
-interface WeeklyRow {
-  rule_id: string;
+  timestamp: string;
+  file: string | null;
+  task_id: string | null;
   week: string;
-  count: number;
-}
-
-interface RepeatRow {
-  rule_id: string;
-  file: string;
-  cnt: number;
 }
 
 interface RuleRow {
@@ -38,81 +25,147 @@ interface RuleRow {
 }
 
 type RuleQualityLabel = 'healthy' | 'dormant' | 'ineffective' | 'over_triggered';
+type RuleEventKind = 'match' | 'violation' | 'fix';
+
+// ─── action 기반 이벤트 분류 ───────────────────────────
+//
+// MCP 도구가 이벤트를 저장할 때 type 필드가 일관되지 않음 (대부분 'query').
+// 실제 의미는 action 필드에 있으므로 action 패턴으로 분류한다.
+// - match: check_rule, rule_pass, rule_guard_* 등 규칙 검토/통과
+// - violation: violation_*, grep_violation_* 등 위반 발견
+// - fix: fix_* 등 수정 적용
+// - type 기반 fallback: type이 정확히 rule_match/violation_found/fix_applied인 경우
+
+function classifyRuleEvent(action: string | null, type: string): RuleEventKind {
+  if (action) {
+    const a = action.toLowerCase();
+    // violation 패턴 (rule_violation, violation_found 등)
+    if (a.includes('violation')) return 'violation';
+    // fix 패턴 (fix_*, modify_fix_*, modify_marker_add_rule_violation은 위에서 걸림)
+    if (a.startsWith('fix_') || a === 'fix') return 'fix';
+    // match 패턴 (check_rule, rule_pass, rule_guard 등)
+    if (a.startsWith('check_') || a.startsWith('rule_')) return 'match';
+  }
+  // type 기반 fallback (향후 올바르게 저장되는 데이터용)
+  if (type === 'violation_found') return 'violation';
+  if (type === 'fix_applied') return 'fix';
+  if (type === 'rule_match') return 'match';
+  return 'match';
+}
 
 // ─── 공통 쿼리 헬퍼 ────────────────────────────────────
 
-function getRuleTypeCounts(projectId: string, days: number) {
+function getRuleEvents(projectId: string, days: number): RuleEventRow[] {
   const sql = days > 0
-    ? `SELECT rule_id, type, COUNT(*) as count
+    ? `SELECT rule_id, action, type, timestamp, file, task_id,
+         strftime('%Y-W%W', timestamp) as week
        FROM events
-       WHERE project_id = ? AND type IN ('rule_match','violation_found','fix_applied')
-         AND rule_id IS NOT NULL
+       WHERE project_id = ? AND rule_id IS NOT NULL
          AND timestamp >= datetime('now', '-${days} days')
-       GROUP BY rule_id, type`
-    : `SELECT rule_id, type, COUNT(*) as count
+       ORDER BY timestamp`
+    : `SELECT rule_id, action, type, timestamp, file, task_id,
+         strftime('%Y-W%W', timestamp) as week
        FROM events
-       WHERE project_id = ? AND type IN ('rule_match','violation_found','fix_applied')
-         AND rule_id IS NOT NULL
-       GROUP BY rule_id, type`;
-  return db.prepare(sql).all(projectId) as TypeCount[];
+       WHERE project_id = ? AND rule_id IS NOT NULL
+       ORDER BY timestamp`;
+  return db.prepare(sql).all(projectId) as RuleEventRow[];
 }
 
-function getAvgFixTimes(projectId: string) {
-  return db.prepare(`
-    SELECT v.rule_id,
-      AVG((julianday(f.timestamp) - julianday(v.timestamp)) * 86400000) as avg_fix_ms
-    FROM events v
-    JOIN events f ON v.task_id = f.task_id AND v.rule_id = f.rule_id
-    WHERE v.project_id = ? AND v.type = 'violation_found'
-      AND f.type = 'fix_applied' AND f.timestamp > v.timestamp
-      AND v.task_id IS NOT NULL
-    GROUP BY v.rule_id
-  `).all(projectId) as AvgFixRow[];
+interface RuleCountMap {
+  counts: Map<string, { match: number; violation: number; fix: number }>;
+  weekly: Map<string, Map<string, { matches: number; violations: number; fixes: number }>>;
+  repeats: Map<string, number>;
+  avgFixMs: Map<string, number>;
+  lastMatch: Map<string, string>;
+  lastViolation: Map<string, string>;
 }
 
-function getWeeklyTrend(projectId: string, days: number) {
-  const sql = days > 0
-    ? `SELECT rule_id, strftime('%Y-W%W', timestamp) as week, type, COUNT(*) as count
-       FROM events
-       WHERE project_id = ? AND type IN ('rule_match','violation_found','fix_applied')
-         AND rule_id IS NOT NULL
-         AND timestamp >= datetime('now', '-${days} days')
-       GROUP BY rule_id, week, type
-       ORDER BY week`
-    : `SELECT rule_id, strftime('%Y-W%W', timestamp) as week, type, COUNT(*) as count
-       FROM events
-       WHERE project_id = ? AND type IN ('rule_match','violation_found','fix_applied')
-         AND rule_id IS NOT NULL
-       GROUP BY rule_id, week, type
-       ORDER BY week`;
-  return db.prepare(sql).all(projectId) as (WeeklyRow & { type: string })[];
-}
+function buildRuleCountMap(rows: RuleEventRow[]): RuleCountMap {
+  const counts = new Map<string, { match: number; violation: number; fix: number }>();
+  const weekly = new Map<string, Map<string, { matches: number; violations: number; fixes: number }>>();
+  const fileViolations = new Map<string, Map<string, number>>(); // rule_id -> file -> count
+  const lastMatch = new Map<string, string>();
+  const lastViolation = new Map<string, string>();
 
-function getRepeatedViolations(projectId: string) {
-  return db.prepare(`
-    SELECT rule_id, file, COUNT(*) as cnt
-    FROM events
-    WHERE project_id = ? AND type = 'violation_found'
-      AND rule_id IS NOT NULL AND file IS NOT NULL
-    GROUP BY rule_id, file
-    HAVING cnt > 1
-  `).all(projectId) as RepeatRow[];
+  // violation→fix 시간 추적: task_id+rule_id → violation timestamp
+  const violationTimes = new Map<string, string[]>(); // key → timestamps
+  const fixTimes: { ruleId: string; fixMs: number }[] = [];
+
+  for (const row of rows) {
+    const kind = classifyRuleEvent(row.action, row.type);
+    const ruleId = row.rule_id;
+
+    // 카운트
+    if (!counts.has(ruleId)) counts.set(ruleId, { match: 0, violation: 0, fix: 0 });
+    const c = counts.get(ruleId)!;
+    c[kind]++;
+
+    // 주간 추이
+    if (!weekly.has(ruleId)) weekly.set(ruleId, new Map());
+    const weekMap = weekly.get(ruleId)!;
+    if (!weekMap.has(row.week)) weekMap.set(row.week, { matches: 0, violations: 0, fixes: 0 });
+    const w = weekMap.get(row.week)!;
+    if (kind === 'match') w.matches++;
+    else if (kind === 'violation') w.violations++;
+    else if (kind === 'fix') w.fixes++;
+
+    // 마지막 이벤트 날짜
+    if (kind === 'match') lastMatch.set(ruleId, row.timestamp);
+    else if (kind === 'violation') lastViolation.set(ruleId, row.timestamp);
+
+    // 반복 위반 파일 추적
+    if (kind === 'violation' && row.file) {
+      if (!fileViolations.has(ruleId)) fileViolations.set(ruleId, new Map());
+      const fm = fileViolations.get(ruleId)!;
+      fm.set(row.file, (fm.get(row.file) ?? 0) + 1);
+    }
+
+    // fix 시간 계산용 추적
+    if (kind === 'violation' && row.task_id) {
+      const key = `${row.task_id}:${ruleId}`;
+      if (!violationTimes.has(key)) violationTimes.set(key, []);
+      violationTimes.get(key)!.push(row.timestamp);
+    }
+    if (kind === 'fix' && row.task_id) {
+      const key = `${row.task_id}:${ruleId}`;
+      const vTimes = violationTimes.get(key);
+      if (vTimes && vTimes.length > 0) {
+        // 가장 최근 violation과 매칭
+        const vTime = vTimes[vTimes.length - 1];
+        const ms = new Date(row.timestamp).getTime() - new Date(vTime).getTime();
+        if (ms > 0) fixTimes.push({ ruleId, fixMs: ms });
+      }
+    }
+  }
+
+  // 반복 위반 수 (동일 rule+file 2회 이상인 파일 수)
+  const repeats = new Map<string, number>();
+  for (const [ruleId, fm] of fileViolations) {
+    let count = 0;
+    for (const cnt of fm.values()) {
+      if (cnt > 1) count++;
+    }
+    if (count > 0) repeats.set(ruleId, count);
+  }
+
+  // 평균 fix 시간
+  const fixByRule = new Map<string, number[]>();
+  for (const { ruleId, fixMs } of fixTimes) {
+    if (!fixByRule.has(ruleId)) fixByRule.set(ruleId, []);
+    fixByRule.get(ruleId)!.push(fixMs);
+  }
+  const avgFixMs = new Map<string, number>();
+  for (const [ruleId, times] of fixByRule) {
+    avgFixMs.set(ruleId, times.reduce((a, b) => a + b, 0) / times.length);
+  }
+
+  return { counts, weekly, repeats, avgFixMs, lastMatch, lastViolation };
 }
 
 function getProjectRules(projectId: string) {
   return db.prepare(
     'SELECT id, category, file_path, description, triggers, item_count FROM rules WHERE project_id = ?',
   ).all(projectId) as RuleRow[];
-}
-
-function getLastEventDates(projectId: string) {
-  return db.prepare(`
-    SELECT rule_id, type, MAX(timestamp) as last_at
-    FROM events
-    WHERE project_id = ? AND type IN ('rule_match', 'violation_found')
-      AND rule_id IS NOT NULL
-    GROUP BY rule_id, type
-  `).all(projectId) as { rule_id: string; type: string; last_at: string }[];
 }
 
 // ─── 1. GET /rules/effectiveness ────────────────────────
@@ -127,47 +180,14 @@ analyticsRouter.get('/rules/effectiveness', (req, res) => {
     const days = daysParam ? Number(daysParam) : 90;
 
     const rules = getProjectRules(projectId);
-    const typeCounts = getRuleTypeCounts(projectId, days);
-    const avgFixes = getAvgFixTimes(projectId);
-    const weeklyRaw = getWeeklyTrend(projectId, days);
-    const repeats = getRepeatedViolations(projectId);
+    const rows = getRuleEvents(projectId, days);
+    const { counts: countMap, weekly, repeats: repeatMap, avgFixMs } = buildRuleCountMap(rows);
 
-    // 맵 구성
-    const countMap = new Map<string, { match: number; violation: number; fix: number }>();
-    for (const row of typeCounts) {
-      if (!countMap.has(row.rule_id)) countMap.set(row.rule_id, { match: 0, violation: 0, fix: 0 });
-      const entry = countMap.get(row.rule_id)!;
-      if (row.type === 'rule_match') entry.match = row.count;
-      else if (row.type === 'violation_found') entry.violation = row.count;
-      else if (row.type === 'fix_applied') entry.fix = row.count;
-    }
-
-    const avgFixMap = new Map(avgFixes.map((r) => [r.rule_id, r.avg_fix_ms]));
-
-    // 주간 추이: { ruleId -> { week -> { matches, violations, fixes } } }
-    const trendMap = new Map<string, Map<string, { matches: number; violations: number; fixes: number }>>();
-    for (const row of weeklyRaw) {
-      if (!trendMap.has(row.rule_id)) trendMap.set(row.rule_id, new Map());
-      const weekMap = trendMap.get(row.rule_id)!;
-      if (!weekMap.has(row.week)) weekMap.set(row.week, { matches: 0, violations: 0, fixes: 0 });
-      const entry = weekMap.get(row.week)!;
-      if (row.type === 'rule_match') entry.matches = row.count;
-      else if (row.type === 'violation_found') entry.violations = row.count;
-      else if (row.type === 'fix_applied') entry.fixes = row.count;
-    }
-
-    // 반복 위반 맵
-    const repeatMap = new Map<string, number>();
-    for (const row of repeats) {
-      repeatMap.set(row.rule_id, (repeatMap.get(row.rule_id) ?? 0) + row.cnt);
-    }
-
-    // 필터
     const targetRules = ruleId ? rules.filter((r) => r.id === ruleId) : rules;
 
     const result = targetRules.map((rule) => {
       const counts = countMap.get(rule.id) ?? { match: 0, violation: 0, fix: 0 };
-      const trend = trendMap.get(rule.id);
+      const trend = weekly.get(rule.id);
       const trendArr = trend
         ? [...trend.entries()].map(([week, v]) => ({ week, ...v }))
         : [];
@@ -182,7 +202,7 @@ analyticsRouter.get('/rules/effectiveness', (req, res) => {
         fixCount: counts.fix,
         violationRate: counts.match > 0 ? counts.violation / counts.match : 0,
         fixRate: counts.violation > 0 ? counts.fix / counts.violation : 0,
-        avgFixTimeMs: avgFixMap.get(rule.id) ?? null,
+        avgFixTimeMs: avgFixMs.get(rule.id) ?? null,
         trend: trendArr,
         repeatedViolations: repeatMap.get(rule.id) ?? 0,
       };
@@ -206,35 +226,8 @@ analyticsRouter.get('/rules/quality', (req, res) => {
     }
 
     const rules = getProjectRules(projectId);
-    const typeCounts = getRuleTypeCounts(projectId, 0); // 전체 기간
-    const avgFixes = getAvgFixTimes(projectId);
-    const repeats = getRepeatedViolations(projectId);
-    const lastDates = getLastEventDates(projectId);
-
-    const countMap = new Map<string, { match: number; violation: number; fix: number }>();
-    for (const row of typeCounts) {
-      if (!countMap.has(row.rule_id)) countMap.set(row.rule_id, { match: 0, violation: 0, fix: 0 });
-      const entry = countMap.get(row.rule_id)!;
-      if (row.type === 'rule_match') entry.match = row.count;
-      else if (row.type === 'violation_found') entry.violation = row.count;
-      else if (row.type === 'fix_applied') entry.fix = row.count;
-    }
-
-    const avgFixMap = new Map(avgFixes.map((r) => [r.rule_id, r.avg_fix_ms]));
-
-    // 반복 위반 파일 수
-    const repeatFileCountMap = new Map<string, number>();
-    for (const row of repeats) {
-      repeatFileCountMap.set(row.rule_id, (repeatFileCountMap.get(row.rule_id) ?? 0) + 1);
-    }
-
-    // 마지막 이벤트 날짜
-    const lastMatchMap = new Map<string, string>();
-    const lastViolationMap = new Map<string, string>();
-    for (const row of lastDates) {
-      if (row.type === 'rule_match') lastMatchMap.set(row.rule_id, row.last_at);
-      else if (row.type === 'violation_found') lastViolationMap.set(row.rule_id, row.last_at);
-    }
+    const rows = getRuleEvents(projectId, 0); // 전체 기간
+    const { counts: countMap, repeats: repeatMap, avgFixMs, lastMatch: lastMatchMap, lastViolation: lastViolationMap } = buildRuleCountMap(rows);
 
     const summary: Record<RuleQualityLabel, number> = {
       healthy: 0,
@@ -245,8 +238,8 @@ analyticsRouter.get('/rules/quality', (req, res) => {
 
     const result = rules.map((rule) => {
       const counts = countMap.get(rule.id) ?? { match: 0, violation: 0, fix: 0 };
-      const avgFixTimeMs = avgFixMap.get(rule.id) ?? null;
-      const repeatFiles = repeatFileCountMap.get(rule.id) ?? 0;
+      const avgFixTimeMs = avgFixMs.get(rule.id) ?? null;
+      const repeatFiles = repeatMap.get(rule.id) ?? 0;
       const violationRate = counts.match > 0 ? counts.violation / counts.match : 0;
 
       // 품질 판정
@@ -309,52 +302,88 @@ analyticsRouter.get('/agent/efficiency', (req, res) => {
       ? `AND timestamp >= datetime('now', '-${days} days')`
       : '';
 
-    // 태스크별 통계
-    const taskBreakdown = db.prepare(`
-      SELECT task_id,
-        MIN(timestamp) as started_at,
-        MAX(timestamp) as completed_at,
-        COUNT(*) as event_count,
-        SUM(CASE WHEN type = 'violation_found' THEN 1 ELSE 0 END) as violations,
-        SUM(CASE WHEN type = 'fix_applied' THEN 1 ELSE 0 END) as fixes
+    // 태스크별 전체 이벤트 (action 기반 분류 필요)
+    const taskEvents = db.prepare(`
+      SELECT task_id, action, type, timestamp, rule_id,
+        strftime('%Y-W%W', timestamp) as week
       FROM events
       WHERE project_id = ? AND task_id IS NOT NULL ${timeFilter}
-      GROUP BY task_id
-      ORDER BY started_at DESC
+      ORDER BY timestamp
     `).all(projectId) as {
-      task_id: string;
-      started_at: string;
-      completed_at: string | null;
-      event_count: number;
-      violations: number;
-      fixes: number;
+      task_id: string; action: string; type: string;
+      timestamp: string; rule_id: string | null; week: string;
     }[];
 
-    // 주간 추이
-    const weeklyTrend = db.prepare(`
-      SELECT strftime('%Y-W%W', timestamp) as week,
-        COUNT(DISTINCT task_id) as tasks,
-        SUM(CASE WHEN type = 'violation_found' THEN 1 ELSE 0 END) as violations,
-        SUM(CASE WHEN type = 'fix_applied' THEN 1 ELSE 0 END) as fixes
-      FROM events
-      WHERE project_id = ? AND task_id IS NOT NULL ${timeFilter}
-      GROUP BY week
-      ORDER BY week
-    `).all(projectId) as { week: string; tasks: number; violations: number; fixes: number }[];
+    // 태스크별 집계
+    const taskMap = new Map<string, {
+      startedAt: string; completedAt: string;
+      eventCount: number; violations: number; fixes: number;
+    }>();
 
-    // 전체 평균 수정 시간
-    const avgFixRow = db.prepare(`
-      SELECT AVG((julianday(f.timestamp) - julianday(v.timestamp)) * 86400000) as avg_fix_ms
-      FROM events v
-      JOIN events f ON v.task_id = f.task_id AND v.rule_id = f.rule_id
-      WHERE v.project_id = ? AND v.type = 'violation_found'
-        AND f.type = 'fix_applied' AND f.timestamp > v.timestamp
-        AND v.task_id IS NOT NULL
-    `).get(projectId) as { avg_fix_ms: number | null } | undefined;
+    // 주간 집계
+    const weekMap = new Map<string, { tasks: Set<string>; violations: number; fixes: number }>();
+
+    // fix 시간 추적
+    const violationTimes = new Map<string, string>(); // task+rule → timestamp
+    const fixTimesAll: number[] = [];
+
+    for (const row of taskEvents) {
+      // 태스크별
+      if (!taskMap.has(row.task_id)) {
+        taskMap.set(row.task_id, {
+          startedAt: row.timestamp, completedAt: row.timestamp,
+          eventCount: 0, violations: 0, fixes: 0,
+        });
+      }
+      const t = taskMap.get(row.task_id)!;
+      t.eventCount++;
+      if (row.timestamp > t.completedAt) t.completedAt = row.timestamp;
+
+      // action 기반 분류 (rule_id 유무와 무관하게)
+      const kind = classifyRuleEvent(row.action, row.type);
+      if (kind === 'violation') {
+        t.violations++;
+        const vKey = row.rule_id ? `${row.task_id}:${row.rule_id}` : `${row.task_id}:_`;
+        violationTimes.set(vKey, row.timestamp);
+      } else if (kind === 'fix') {
+        t.fixes++;
+        // violation→fix 시간 계산: 같은 task의 마지막 violation과 매칭
+        const vKey = row.rule_id ? `${row.task_id}:${row.rule_id}` : `${row.task_id}:_`;
+        const vTime = violationTimes.get(vKey);
+        if (vTime) {
+          const ms = new Date(row.timestamp).getTime() - new Date(vTime).getTime();
+          if (ms > 0) fixTimesAll.push(ms);
+        }
+      }
+
+      // 주간별
+      if (!weekMap.has(row.week)) weekMap.set(row.week, { tasks: new Set(), violations: 0, fixes: 0 });
+      const w = weekMap.get(row.week)!;
+      w.tasks.add(row.task_id);
+      if (kind === 'violation') w.violations++;
+      else if (kind === 'fix') w.fixes++;
+    }
+
+    const taskBreakdown = [...taskMap.entries()].map(([taskId, t]) => ({
+      taskId,
+      startedAt: t.startedAt,
+      completedAt: t.completedAt,
+      eventCount: t.eventCount,
+      violationCount: t.violations,
+      fixCount: t.fixes,
+      fixRate: t.violations > 0 ? t.fixes / t.violations : 0,
+    })).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 
     const totalTasks = taskBreakdown.length;
-    const totalViolations = taskBreakdown.reduce((s, t) => s + t.violations, 0);
-    const totalFixes = taskBreakdown.reduce((s, t) => s + t.fixes, 0);
+    const totalViolations = taskBreakdown.reduce((s, t) => s + t.violationCount, 0);
+    const totalFixes = taskBreakdown.reduce((s, t) => s + t.fixCount, 0);
+    const avgFixTimeMs = fixTimesAll.length > 0
+      ? fixTimesAll.reduce((a, b) => a + b, 0) / fixTimesAll.length
+      : null;
+
+    const weeklyTrend = [...weekMap.entries()]
+      .map(([week, w]) => ({ week, tasks: w.tasks.size, violations: w.violations, fixes: w.fixes }))
+      .sort((a, b) => a.week.localeCompare(b.week));
 
     res.json({
       summary: {
@@ -363,17 +392,9 @@ analyticsRouter.get('/agent/efficiency', (req, res) => {
         totalFixes,
         violationRate: totalTasks > 0 ? totalViolations / totalTasks : 0,
         fixSuccessRate: totalViolations > 0 ? totalFixes / totalViolations : 0,
-        avgFixTimeMs: avgFixRow?.avg_fix_ms ?? null,
+        avgFixTimeMs,
       },
-      taskBreakdown: taskBreakdown.map((t) => ({
-        taskId: t.task_id,
-        startedAt: t.started_at,
-        completedAt: t.completed_at,
-        eventCount: t.event_count,
-        violationCount: t.violations,
-        fixCount: t.fixes,
-        fixRate: t.violations > 0 ? t.fixes / t.violations : 0,
-      })),
+      taskBreakdown,
       trend: weeklyTrend,
     });
   } catch (err: unknown) {
@@ -402,44 +423,62 @@ analyticsRouter.get('/rules/:ruleId', (req, res) => {
       return;
     }
 
-    // 카운트
-    const typeCounts = db.prepare(`
-      SELECT type, COUNT(*) as count
+    // action 기반 분류를 위해 원시 이벤트 조회
+    const ruleEvents = db.prepare(`
+      SELECT id, action, type, timestamp, file, message, severity, task_id,
+        strftime('%Y-W%W', timestamp) as week
       FROM events
-      WHERE project_id = ? AND rule_id = ? AND type IN ('rule_match','violation_found','fix_applied')
-      GROUP BY type
-    `).all(projectId, ruleId) as { type: string; count: number }[];
+      WHERE project_id = ? AND rule_id = ?
+      ORDER BY timestamp
+    `).all(projectId, ruleId) as {
+      id: string; action: string; type: string; timestamp: string;
+      file: string | null; message: string | null; severity: string | null;
+      task_id: string | null; week: string;
+    }[];
 
     const counts = { match: 0, violation: 0, fix: 0 };
-    for (const row of typeCounts) {
-      if (row.type === 'rule_match') counts.match = row.count;
-      else if (row.type === 'violation_found') counts.violation = row.count;
-      else if (row.type === 'fix_applied') counts.fix = row.count;
+    const trendMap = new Map<string, { matches: number; violations: number; fixes: number }>();
+    const fileViolationCount = new Map<string, number>();
+    const fileLastAt = new Map<string, string>();
+    const violationEvents: typeof ruleEvents = [];
+    const violationTimes = new Map<string, string>(); // task_id → timestamp
+    const fixTimesArr: number[] = [];
+
+    for (const row of ruleEvents) {
+      const kind = classifyRuleEvent(row.action, row.type);
+      counts[kind]++;
+
+      // 주간 추이
+      if (!trendMap.has(row.week)) trendMap.set(row.week, { matches: 0, violations: 0, fixes: 0 });
+      const w = trendMap.get(row.week)!;
+      if (kind === 'match') w.matches++;
+      else if (kind === 'violation') w.violations++;
+      else if (kind === 'fix') w.fixes++;
+
+      if (kind === 'violation') {
+        violationEvents.push(row);
+        if (row.file) {
+          fileViolationCount.set(row.file, (fileViolationCount.get(row.file) ?? 0) + 1);
+          fileLastAt.set(row.file, row.timestamp);
+        }
+        if (row.task_id) violationTimes.set(row.task_id, row.timestamp);
+      }
+      if (kind === 'fix' && row.task_id) {
+        const vTime = violationTimes.get(row.task_id);
+        if (vTime) {
+          const ms = new Date(row.timestamp).getTime() - new Date(vTime).getTime();
+          if (ms > 0) fixTimesArr.push(ms);
+        }
+      }
     }
 
-    // 평균 수정 시간
-    const avgRow = db.prepare(`
-      SELECT AVG((julianday(f.timestamp) - julianday(v.timestamp)) * 86400000) as avg_fix_ms
-      FROM events v
-      JOIN events f ON v.task_id = f.task_id AND v.rule_id = f.rule_id
-      WHERE v.project_id = ? AND v.rule_id = ? AND v.type = 'violation_found'
-        AND f.type = 'fix_applied' AND f.timestamp > v.timestamp
-        AND v.task_id IS NOT NULL
-    `).get(projectId, ruleId) as { avg_fix_ms: number | null } | undefined;
+    const avgFixTimeMs = fixTimesArr.length > 0
+      ? fixTimesArr.reduce((a, b) => a + b, 0) / fixTimesArr.length
+      : null;
 
-    // 품질 판정 (quality 엔드포인트와 동일 로직)
-    const repeats = db.prepare(`
-      SELECT file, COUNT(*) as cnt
-      FROM events
-      WHERE project_id = ? AND rule_id = ? AND type = 'violation_found'
-        AND file IS NOT NULL
-      GROUP BY file
-      HAVING cnt > 1
-    `).all(projectId, ruleId) as { file: string; cnt: number }[];
-
-    const repeatFiles = repeats.length;
+    // 품질 판정
+    const repeatFiles = [...fileViolationCount.values()].filter((c) => c > 1).length;
     const violationRate = counts.match > 0 ? counts.violation / counts.match : 0;
-    const avgFixTimeMs = avgRow?.avg_fix_ms ?? null;
 
     let quality: RuleQualityLabel = 'healthy';
     let reason = '정상 운영 중';
@@ -456,34 +495,22 @@ analyticsRouter.get('/rules/:ruleId', (req, res) => {
       reason = `매칭 ${counts.match}건 중 위반율 ${(violationRate * 100).toFixed(1)}%`;
     }
 
-    // 위반 이력
-    const violations = db.prepare(`
-      SELECT id, timestamp, file, message, severity, task_id
-      FROM events
-      WHERE project_id = ? AND rule_id = ? AND type = 'violation_found'
-      ORDER BY timestamp DESC
-      LIMIT 100
-    `).all(projectId, ruleId) as {
-      id: string; timestamp: string; file: string | null;
-      message: string | null; severity: string | null; task_id: string | null;
-    }[];
-
-    // 각 위반에 대해 fix 여부 + fix 시간 확인
-    const fixCheck = db.prepare(`
-      SELECT MIN(timestamp) as fix_at
-      FROM events
-      WHERE project_id = ? AND rule_id = ? AND task_id = ? AND type = 'fix_applied'
-        AND timestamp > ?
-    `);
-
-    const violationDetails = violations.map((v) => {
+    // 위반 이력 상세 (최근 100건)
+    const recentViolations = violationEvents.slice(-100).reverse();
+    const violationDetails = recentViolations.map((v) => {
       let fixed = false;
       let fixTimeMs: number | null = null;
       if (v.task_id) {
-        const fixRow = fixCheck.get(projectId, ruleId, v.task_id, v.timestamp) as { fix_at: string | null } | undefined;
-        if (fixRow?.fix_at) {
+        const vTime = new Date(v.timestamp).getTime();
+        // 같은 task 내에서 이후 fix 이벤트 찾기
+        const fixEvent = ruleEvents.find((e) =>
+          e.task_id === v.task_id &&
+          classifyRuleEvent(e.action, e.type) === 'fix' &&
+          new Date(e.timestamp).getTime() > vTime,
+        );
+        if (fixEvent) {
           fixed = true;
-          fixTimeMs = (new Date(fixRow.fix_at).getTime() - new Date(v.timestamp).getTime());
+          fixTimeMs = new Date(fixEvent.timestamp).getTime() - vTime;
         }
       }
       return {
@@ -498,33 +525,15 @@ analyticsRouter.get('/rules/:ruleId', (req, res) => {
       };
     });
 
-    // 주간 추이
-    const weeklyTrend = db.prepare(`
-      SELECT strftime('%Y-W%W', timestamp) as week, type, COUNT(*) as count
-      FROM events
-      WHERE project_id = ? AND rule_id = ? AND type IN ('rule_match','violation_found','fix_applied')
-      GROUP BY week, type
-      ORDER BY week
-    `).all(projectId, ruleId) as { week: string; type: string; count: number }[];
-
-    const trendMap = new Map<string, { matches: number; violations: number; fixes: number }>();
-    for (const row of weeklyTrend) {
-      if (!trendMap.has(row.week)) trendMap.set(row.week, { matches: 0, violations: 0, fixes: 0 });
-      const entry = trendMap.get(row.week)!;
-      if (row.type === 'rule_match') entry.matches = row.count;
-      else if (row.type === 'violation_found') entry.violations = row.count;
-      else if (row.type === 'fix_applied') entry.fixes = row.count;
-    }
-
     // 상위 위반 파일
-    const topFiles = db.prepare(`
-      SELECT file, COUNT(*) as violation_count, MAX(timestamp) as last_at
-      FROM events
-      WHERE project_id = ? AND rule_id = ? AND type = 'violation_found' AND file IS NOT NULL
-      GROUP BY file
-      ORDER BY violation_count DESC
-      LIMIT 10
-    `).all(projectId, ruleId) as { file: string; violation_count: number; last_at: string }[];
+    const topFiles = [...fileViolationCount.entries()]
+      .map(([file, violation_count]) => ({
+        file,
+        violation_count,
+        last_at: fileLastAt.get(file) ?? '',
+      }))
+      .sort((a, b) => b.violation_count - a.violation_count)
+      .slice(0, 10);
 
     res.json({
       rule: {
@@ -617,35 +626,32 @@ analyticsRouter.get('/compare', (req, res) => {
       typeCountMap.get(row.project_id)!.set(row.type, row.count);
     }
 
-    // 프로젝트별 규칙 관련 카운트
-    const ruleEventCounts = db.prepare(`
-      SELECT project_id, type, COUNT(*) as count
+    // 프로젝트별 규칙 관련 카운트 (action 기반 분류)
+    const allRuleEvents = db.prepare(`
+      SELECT project_id, action, type
       FROM events
-      WHERE type IN ('rule_match', 'violation_found', 'fix_applied')
-      GROUP BY project_id, type
-    `).all() as { project_id: string; type: string; count: number }[];
+      WHERE rule_id IS NOT NULL
+    `).all() as { project_id: string; action: string; type: string }[];
 
     const ruleEventMap = new Map<string, { match: number; violation: number; fix: number }>();
-    for (const row of ruleEventCounts) {
+    for (const row of allRuleEvents) {
       if (!ruleEventMap.has(row.project_id)) ruleEventMap.set(row.project_id, { match: 0, violation: 0, fix: 0 });
-      const entry = ruleEventMap.get(row.project_id)!;
-      if (row.type === 'rule_match') entry.match = row.count;
-      else if (row.type === 'violation_found') entry.violation = row.count;
-      else if (row.type === 'fix_applied') entry.fix = row.count;
+      const kind = classifyRuleEvent(row.action, row.type);
+      ruleEventMap.get(row.project_id)![kind]++;
     }
 
-    // 프로젝트별 평균 수정 시간
-    const avgFixAll = db.prepare(`
-      SELECT v.project_id,
-        AVG((julianday(f.timestamp) - julianday(v.timestamp)) * 86400000) as avg_fix_ms
-      FROM events v
-      JOIN events f ON v.task_id = f.task_id AND v.rule_id = f.rule_id AND v.project_id = f.project_id
-      WHERE v.type = 'violation_found'
-        AND f.type = 'fix_applied' AND f.timestamp > v.timestamp
-        AND v.task_id IS NOT NULL
-      GROUP BY v.project_id
-    `).all() as { project_id: string; avg_fix_ms: number }[];
-    const avgFixAllMap = new Map(avgFixAll.map((r) => [r.project_id, r.avg_fix_ms]));
+    // 프로젝트별 평균 수정 시간 (action 기반)
+    const avgFixAllMap = new Map<string, number>();
+    for (const p of targetProjects) {
+      const rows = getRuleEvents(p.id, 0);
+      const { avgFixMs } = buildRuleCountMap(rows);
+      // 전체 규칙의 평균
+      const allMs: number[] = [];
+      for (const ms of avgFixMs.values()) allMs.push(ms);
+      if (allMs.length > 0) {
+        avgFixAllMap.set(p.id, allMs.reduce((a, b) => a + b, 0) / allMs.length);
+      }
+    }
 
     // 최대 refIntensity (정규화 기준)
     let maxRefIntensity = 0;
@@ -714,6 +720,299 @@ analyticsRouter.get('/compare', (req, res) => {
     }
 
     res.json({ projects: projectResults });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// ─── 6. GET /insights ─────────────────────────────────
+
+type Phase = 'receive' | 'plan' | 'explore' | 'rule_check' | 'implement' | 'verify' | 'complete' | 'other';
+
+function classifyPhase(action: string): Phase {
+  const a = action.toLowerCase();
+  if (a.startsWith('receive_') || a === 'receive_task') return 'receive';
+  if (/^(plan|analyze|review|decide|compile|synthesize|finalize|confirm|report|adjust)/.test(a)) return 'plan';
+  if (/^(read|search|scan|find|trace|list|identify|understand)/.test(a)) return 'explore';
+  if (/^(check|rule_)/.test(a)) return 'rule_check';
+  if (/^(modify|create|fix|add|update|write|edit|delete|rewrite|implement|harden|apply)/.test(a)) return 'implement';
+  if (/^(build|run|test|typecheck|verify|lint|validate)/.test(a)) return 'verify';
+  if (/^(task_complete|commit)/.test(a)) return 'complete';
+  return 'other';
+}
+
+analyticsRouter.get('/insights', (req, res) => {
+  try {
+    const { projectId, days: daysParam } = req.query;
+    if (!projectId || typeof projectId !== 'string') {
+      res.status(400).json({ error: 'projectId is required' });
+      return;
+    }
+    const days = daysParam ? Number(daysParam) : 90;
+    const timeFilter = days > 0
+      ? `AND timestamp >= datetime('now', '-${days} days')`
+      : '';
+
+    // 전체 이벤트 조회 (태스크 분석용)
+    const allEvents = db.prepare(`
+      SELECT id, action, type, timestamp, rule_id, file, task_id, message,
+        strftime('%H', timestamp) as hour
+      FROM events
+      WHERE project_id = ? ${timeFilter}
+      ORDER BY timestamp
+    `).all(projectId) as {
+      id: string; action: string; type: string; timestamp: string;
+      rule_id: string | null; file: string | null; task_id: string | null;
+      message: string | null; hour: string;
+    }[];
+
+    // ─── 규칙 인사이트 ─────────────────────────────
+
+    // (A) Violation Pattern Clustering
+    const violationPatterns = new Map<string, { rule: string; count: number; examples: string[] }>();
+    for (const e of allEvents) {
+      if (classifyRuleEvent(e.action, e.type) !== 'violation' || !e.message) continue;
+      // "MUST: <규칙 문구>" 또는 "MUST NOT: <규칙 문구>" 추출
+      const match = e.message.match(/^(MUST NOT|MUST|PREFER):\s*(.+?)(?:\s*[—\-–]|$)/);
+      const pattern = match ? match[2].trim().substring(0, 60) : e.message.substring(0, 60);
+      const key = `${e.rule_id ?? '_'}::${pattern}`;
+      if (!violationPatterns.has(key)) {
+        violationPatterns.set(key, { rule: e.rule_id ?? 'unknown', count: 0, examples: [] });
+      }
+      const entry = violationPatterns.get(key)!;
+      entry.count++;
+      if (entry.examples.length < 2) entry.examples.push(e.message.substring(0, 120));
+    }
+    const violationClusters = [...violationPatterns.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // (B) Hotspot Files (규칙 횡단 파일별 위반 집계)
+    const fileViolations = new Map<string, Map<string, number>>();
+    for (const e of allEvents) {
+      if (classifyRuleEvent(e.action, e.type) !== 'violation' || !e.file) continue;
+      if (!fileViolations.has(e.file)) fileViolations.set(e.file, new Map());
+      const rm = fileViolations.get(e.file)!;
+      const ruleId = e.rule_id ?? 'unknown';
+      rm.set(ruleId, (rm.get(ruleId) ?? 0) + 1);
+    }
+    const hotspotFiles = [...fileViolations.entries()]
+      .map(([file, ruleMap]) => ({
+        file,
+        totalViolations: [...ruleMap.values()].reduce((a, b) => a + b, 0),
+        rules: Object.fromEntries(ruleMap),
+      }))
+      .sort((a, b) => b.totalViolations - a.totalViolations)
+      .slice(0, 10);
+
+    // (C) Rule Co-occurrence (같은 태스크에서 동시 위반)
+    const taskViolatedRules = new Map<string, Set<string>>();
+    for (const e of allEvents) {
+      if (classifyRuleEvent(e.action, e.type) !== 'violation' || !e.task_id || !e.rule_id) continue;
+      if (!taskViolatedRules.has(e.task_id)) taskViolatedRules.set(e.task_id, new Set());
+      taskViolatedRules.get(e.task_id)!.add(e.rule_id);
+    }
+    const pairCount = new Map<string, number>();
+    for (const rules of taskViolatedRules.values()) {
+      const arr = [...rules].sort();
+      for (let i = 0; i < arr.length; i++) {
+        for (let j = i + 1; j < arr.length; j++) {
+          const key = `${arr[i]}+${arr[j]}`;
+          pairCount.set(key, (pairCount.get(key) ?? 0) + 1);
+        }
+      }
+    }
+    const ruleCoOccurrence = [...pairCount.entries()]
+      .map(([pair, count]) => {
+        const [ruleA, ruleB] = pair.split('+');
+        return { ruleA, ruleB, count };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // (D) Violation Stories (위반 포함 태스크의 행동 시퀀스)
+    const violationTaskIds = new Set<string>();
+    for (const e of allEvents) {
+      if (classifyRuleEvent(e.action, e.type) === 'violation' && e.task_id) {
+        violationTaskIds.add(e.task_id);
+      }
+    }
+    const violationStories: {
+      taskId: string; durationSec: number;
+      steps: { action: string; phase: Phase; ruleId: string | null; kind: RuleEventKind | null; timestamp: string }[];
+      violationCount: number; resolved: boolean;
+    }[] = [];
+    const taskEventsMap = new Map<string, typeof allEvents>();
+    for (const e of allEvents) {
+      if (!e.task_id || !violationTaskIds.has(e.task_id)) continue;
+      if (!taskEventsMap.has(e.task_id)) taskEventsMap.set(e.task_id, []);
+      taskEventsMap.get(e.task_id)!.push(e);
+    }
+    for (const [taskId, events] of taskEventsMap) {
+      if (events.length < 2) continue;
+      const t0 = new Date(events[0].timestamp).getTime();
+      const tN = new Date(events[events.length - 1].timestamp).getTime();
+      let vCount = 0;
+      let fCount = 0;
+      const steps = events.map((e) => {
+        const kind = e.rule_id ? classifyRuleEvent(e.action, e.type) : null;
+        if (kind === 'violation') vCount++;
+        if (kind === 'fix') fCount++;
+        return {
+          action: e.action,
+          phase: classifyPhase(e.action),
+          ruleId: e.rule_id,
+          kind,
+          timestamp: e.timestamp,
+        };
+      });
+      violationStories.push({
+        taskId,
+        durationSec: Math.round((tN - t0) / 1000),
+        steps,
+        violationCount: vCount,
+        resolved: fCount >= vCount && vCount > 0,
+      });
+    }
+    // 최근 10건
+    const recentViolationStories = violationStories
+      .sort((a, b) => b.steps[0].timestamp.localeCompare(a.steps[0].timestamp))
+      .slice(0, 10);
+
+    // (E) Agent Behavior Flow (phase별 평균 이벤트 수)
+    const allTaskPhases = new Map<string, Map<Phase, number>>();
+    for (const e of allEvents) {
+      if (!e.task_id) continue;
+      if (!allTaskPhases.has(e.task_id)) allTaskPhases.set(e.task_id, new Map());
+      const pm = allTaskPhases.get(e.task_id)!;
+      const phase = classifyPhase(e.action);
+      pm.set(phase, (pm.get(phase) ?? 0) + 1);
+    }
+    const phaseTotals = new Map<Phase, number>();
+    const taskCount = allTaskPhases.size;
+    for (const pm of allTaskPhases.values()) {
+      for (const [phase, count] of pm) {
+        phaseTotals.set(phase, (phaseTotals.get(phase) ?? 0) + count);
+      }
+    }
+    const behaviorFlow = (['receive', 'plan', 'explore', 'rule_check', 'implement', 'verify', 'complete'] as Phase[])
+      .map((phase) => ({
+        phase,
+        totalEvents: phaseTotals.get(phase) ?? 0,
+        avgPerTask: taskCount > 0 ? Math.round(((phaseTotals.get(phase) ?? 0) / taskCount) * 10) / 10 : 0,
+      }));
+
+    // ─── 시간축 분석 ───────────────────────────────
+
+    // (F) 태스크 소요시간 분포
+    const taskDurations: { taskId: string; durationSec: number; eventCount: number; fileCount: number }[] = [];
+    const taskMeta = new Map<string, { events: number; files: Set<string>; start: string; end: string }>();
+    for (const e of allEvents) {
+      if (!e.task_id) continue;
+      if (!taskMeta.has(e.task_id)) {
+        taskMeta.set(e.task_id, { events: 0, files: new Set(), start: e.timestamp, end: e.timestamp });
+      }
+      const m = taskMeta.get(e.task_id)!;
+      m.events++;
+      if (e.file) e.file.split(',').forEach((f) => m.files.add(f.trim()));
+      if (e.timestamp > m.end) m.end = e.timestamp;
+    }
+    const durationBuckets = new Map<string, number>();
+    for (const [taskId, m] of taskMeta) {
+      const dur = (new Date(m.end).getTime() - new Date(m.start).getTime()) / 1000;
+      taskDurations.push({ taskId, durationSec: dur, eventCount: m.events, fileCount: m.files.size });
+      const bucket = dur < 60 ? '<1m' : dur < 300 ? '1-5m' : dur < 600 ? '5-10m'
+        : dur < 1800 ? '10-30m' : dur < 3600 ? '30-60m' : '60m+';
+      durationBuckets.set(bucket, (durationBuckets.get(bucket) ?? 0) + 1);
+    }
+    const durationDistribution = ['<1m', '1-5m', '5-10m', '10-30m', '30-60m', '60m+']
+      .map((bucket) => ({ bucket, count: durationBuckets.get(bucket) ?? 0 }));
+
+    // (G) Phase별 시간 비율 (태스크 내 이벤트 간 시간 간격을 해당 phase에 할당)
+    const phaseTimeMs = new Map<Phase, number>();
+    for (const events of taskEventsMap.values()) {
+      for (let i = 1; i < events.length; i++) {
+        const dt = new Date(events[i].timestamp).getTime() - new Date(events[i - 1].timestamp).getTime();
+        if (dt > 600000) continue; // 10분 이상 간격은 idle로 간주하여 제외
+        const phase = classifyPhase(events[i - 1].action);
+        phaseTimeMs.set(phase, (phaseTimeMs.get(phase) ?? 0) + dt);
+      }
+    }
+    // 전체 태스크에서도 계산 (violation task만이 아닌 전체)
+    const allTaskEvents = new Map<string, typeof allEvents>();
+    for (const e of allEvents) {
+      if (!e.task_id) continue;
+      if (!allTaskEvents.has(e.task_id)) allTaskEvents.set(e.task_id, []);
+      allTaskEvents.get(e.task_id)!.push(e);
+    }
+    const phaseTimeMsAll = new Map<Phase, number>();
+    for (const events of allTaskEvents.values()) {
+      for (let i = 1; i < events.length; i++) {
+        const dt = new Date(events[i].timestamp).getTime() - new Date(events[i - 1].timestamp).getTime();
+        if (dt > 600000) continue;
+        const phase = classifyPhase(events[i - 1].action);
+        phaseTimeMsAll.set(phase, (phaseTimeMsAll.get(phase) ?? 0) + dt);
+      }
+    }
+    const totalPhaseTime = [...phaseTimeMsAll.values()].reduce((a, b) => a + b, 0);
+    const phaseTimeDistribution = (['plan', 'explore', 'rule_check', 'implement', 'verify'] as Phase[])
+      .map((phase) => ({
+        phase,
+        timeMs: phaseTimeMsAll.get(phase) ?? 0,
+        percentage: totalPhaseTime > 0 ? Math.round(((phaseTimeMsAll.get(phase) ?? 0) / totalPhaseTime) * 1000) / 10 : 0,
+      }));
+
+    // (H) 시간대별 활동량
+    const hourlyActivity = new Array(24).fill(0);
+    for (const e of allEvents) {
+      hourlyActivity[parseInt(e.hour)]++;
+    }
+    const hourlyDistribution = hourlyActivity.map((count, hour) => ({ hour, count }));
+
+    // (I) 태스크 복잡도 vs 소요시간
+    const complexityData = taskDurations
+      .filter((t) => t.durationSec > 0 && t.eventCount > 1)
+      .map((t) => ({
+        taskId: t.taskId,
+        events: t.eventCount,
+        files: t.fileCount,
+        durationMin: Math.round(t.durationSec / 6) / 10,
+      }))
+      .sort((a, b) => b.durationMin - a.durationMin)
+      .slice(0, 50);
+
+    // (J) 일별 생산성 (완료 태스크 수 + 평균 소요시간)
+    const dailyStats = new Map<string, { tasks: Set<string>; totalDur: number; events: number }>();
+    for (const e of allEvents) {
+      const day = e.timestamp.slice(0, 10);
+      if (!dailyStats.has(day)) dailyStats.set(day, { tasks: new Set(), totalDur: 0, events: 0 });
+      const d = dailyStats.get(day)!;
+      if (e.task_id) d.tasks.add(e.task_id);
+      d.events++;
+    }
+    const dailyProductivity = [...dailyStats.entries()]
+      .map(([date, d]) => ({
+        date,
+        tasks: d.tasks.size,
+        events: d.events,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      // 규칙 인사이트
+      violationClusters,
+      hotspotFiles,
+      ruleCoOccurrence,
+      violationStories: recentViolationStories,
+      behaviorFlow,
+      // 시간축 분석
+      durationDistribution,
+      phaseTimeDistribution,
+      hourlyDistribution,
+      complexityData,
+      dailyProductivity,
+    });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     res.status(500).json({ error: message });

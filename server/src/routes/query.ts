@@ -13,7 +13,7 @@ export const queryRouter = Router();
 const WORD_TO_TYPE: Record<string, EventType> = {
   // rule_compliance
   rule: 'rule_match',
-  violation: 'rule_match',
+  violation: 'violation_found',
   check: 'rule_match',
   verify: 'build_run',
   test: 'build_run',
@@ -53,7 +53,7 @@ const WORD_TO_TYPE: Record<string, EventType> = {
   implement: 'code_modify',
   update: 'code_modify',
   write: 'code_modify',
-  fix: 'code_modify',
+  fix: 'fix_applied',
   harden: 'code_modify',
   protect: 'code_modify',
   apply: 'code_modify',
