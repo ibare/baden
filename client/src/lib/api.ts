@@ -302,6 +302,71 @@ export interface AnalyticsInsightsResponse {
   dailyProductivity: DailyProductivityItem[];
 }
 
+// ─── Deep Comparison Types ──────────────────────────────
+
+export interface ProjectProfileData {
+  totalEvents: number;
+  totalTasks: number;
+  totalFiles: number;
+  ruleCount: number;
+  itemCount: number;
+  firstEventAt: string | null;
+  lastEventAt: string | null;
+  activeDays: number;
+  avgEventsPerDay: number;
+  dailySparkline: { date: string; count: number }[];
+}
+
+export interface WorkflowDNAItem {
+  phase: Phase;
+  eventRatio: number;
+  timeRatio: number;
+}
+
+export interface TaskProfileData {
+  avgDurationMin: number;
+  avgEventsPerTask: number;
+  avgFilesPerTask: number;
+  durationDistribution: DurationBucket[];
+}
+
+export interface RuleComplianceData {
+  matchCount: number;
+  violationCount: number;
+  fixCount: number;
+  complianceRate: number;
+  topViolatedRules: { ruleId: string; count: number }[];
+}
+
+export interface DeepProjectData {
+  projectId: string;
+  projectName: string;
+  profile: ProjectProfileData;
+  workflowDNA: WorkflowDNAItem[];
+  taskProfile: TaskProfileData;
+  hourlyActivity: number[];
+  ruleCompliance: RuleComplianceData;
+}
+
+export interface RuleHeatmapItem {
+  ruleId: string;
+  total: number;
+  byProject: Record<string, number>;
+}
+
+export interface HourlyHeatmapItem {
+  projectId: string;
+  projectName: string;
+  hours: number[];
+}
+
+export interface DeepComparisonResponse {
+  projects: DeepProjectData[];
+  productivityTimeline: Record<string, unknown>[];
+  ruleHeatmap: RuleHeatmapItem[];
+  hourlyHeatmap: HourlyHeatmapItem[];
+}
+
 export const api = {
   getInsights: () => request<InsightsResponse>('/insights'),
   getProjects: () => request<Project[]>('/projects'),
@@ -425,5 +490,10 @@ export const api = {
     const qs = new URLSearchParams({ projectId });
     if (params?.days) qs.set('days', String(params.days));
     return request<AnalyticsInsightsResponse>(`/analytics/insights?${qs}`);
+  },
+
+  getAnalyticsCompareDeep: (projectIds?: string[]) => {
+    const qs = projectIds ? `?projectIds=${projectIds.join(',')}` : '';
+    return request<DeepComparisonResponse>(`/analytics/compare/deep${qs}`);
   },
 };

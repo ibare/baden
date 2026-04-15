@@ -726,7 +726,7 @@ analyticsRouter.get('/compare', (req, res) => {
   }
 });
 
-// ─── 6. GET /insights ─────────────────────────────────
+// ─── 공통 phase 분류 ─────────────────────────────────
 
 type Phase = 'receive' | 'plan' | 'explore' | 'rule_check' | 'implement' | 'verify' | 'complete' | 'other';
 
@@ -741,6 +741,280 @@ function classifyPhase(action: string): Phase {
   if (/^(task_complete|commit)/.test(a)) return 'complete';
   return 'other';
 }
+
+// ─── 6. GET /compare/deep ────────────────────────────
+
+const WORKFLOW_PHASES: Phase[] = ['receive', 'plan', 'explore', 'rule_check', 'implement', 'verify', 'complete'];
+
+analyticsRouter.get('/compare/deep', (req, res) => {
+  try {
+    const { projectIds } = req.query;
+    const filterIds = projectIds && typeof projectIds === 'string'
+      ? projectIds.split(',').map((s) => s.trim())
+      : null;
+
+    const projects = db.prepare('SELECT id, name FROM projects ORDER BY created_at DESC')
+      .all() as { id: string; name: string }[];
+    const targetProjects = filterIds
+      ? projects.filter((p) => filterIds.includes(p.id))
+      : projects;
+
+    if (targetProjects.length === 0) {
+      res.json({ projects: [] });
+      return;
+    }
+
+    // 전체 이벤트 로드 (대상 프로젝트)
+    const placeholders = targetProjects.map(() => '?').join(',');
+    const allEvents = db.prepare(`
+      SELECT id, project_id, action, type, timestamp, rule_id, file, task_id, message,
+        strftime('%H', timestamp) as hour
+      FROM events
+      WHERE project_id IN (${placeholders})
+      ORDER BY timestamp
+    `).all(...targetProjects.map((p) => p.id)) as {
+      id: string; project_id: string; action: string; type: string;
+      timestamp: string; rule_id: string | null; file: string | null;
+      task_id: string | null; message: string | null; hour: string;
+    }[];
+
+    // 프로젝트별 이벤트 그룹핑
+    const eventsByProject = new Map<string, typeof allEvents>();
+    for (const e of allEvents) {
+      if (!eventsByProject.has(e.project_id)) eventsByProject.set(e.project_id, []);
+      eventsByProject.get(e.project_id)!.push(e);
+    }
+
+    // 프로젝트별 규칙 수
+    const ruleCounts = db.prepare(
+      'SELECT project_id, COUNT(*) as group_count, COALESCE(SUM(item_count), 0) as item_count FROM rules GROUP BY project_id',
+    ).all() as { project_id: string; group_count: number; item_count: number }[];
+    const ruleMap = new Map(ruleCounts.map((r) => [r.project_id, r]));
+
+    // ─── 프로젝트별 계산 ───
+    const projectData = targetProjects.map((p) => {
+      const events = eventsByProject.get(p.id) ?? [];
+      const ruleInfo = ruleMap.get(p.id);
+
+      // 태스크별 이벤트 그룹핑
+      const taskEvents = new Map<string, typeof events>();
+      for (const e of events) {
+        if (!e.task_id) continue;
+        if (!taskEvents.has(e.task_id)) taskEvents.set(e.task_id, []);
+        taskEvents.get(e.task_id)!.push(e);
+      }
+
+      // ─ Profile: 기본 통계
+      const totalEvents = events.length;
+      const totalTasks = taskEvents.size;
+      const uniqueFiles = new Set(events.filter((e) => e.file).map((e) => e.file));
+      const firstEvent = events[0]?.timestamp ?? null;
+      const lastEvent = events.length > 0 ? events[events.length - 1].timestamp : null;
+
+      // 일별 활동 (스파크라인용)
+      const dailyEvents = new Map<string, number>();
+      for (const e of events) {
+        const day = e.timestamp.slice(0, 10);
+        dailyEvents.set(day, (dailyEvents.get(day) ?? 0) + 1);
+      }
+      const dailySparkline = [...dailyEvents.entries()]
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // ─ Workflow DNA: phase별 이벤트 수 + 시간 비율
+      const phaseCounts = new Map<Phase, number>();
+      const phaseTimeMs = new Map<Phase, number>();
+      for (const e of events) {
+        const phase = classifyPhase(e.action);
+        phaseCounts.set(phase, (phaseCounts.get(phase) ?? 0) + 1);
+      }
+      // phase 시간 계산 (태스크 내 이벤트 간격 기반)
+      for (const taskEvts of taskEvents.values()) {
+        for (let i = 1; i < taskEvts.length; i++) {
+          const dt = new Date(taskEvts[i].timestamp).getTime() - new Date(taskEvts[i - 1].timestamp).getTime();
+          if (dt > 600000) continue; // 10분 이상은 idle
+          const phase = classifyPhase(taskEvts[i - 1].action);
+          phaseTimeMs.set(phase, (phaseTimeMs.get(phase) ?? 0) + dt);
+        }
+      }
+      const totalPhaseTime = [...phaseTimeMs.values()].reduce((a, b) => a + b, 0);
+      const totalPhaseCount = [...phaseCounts.values()].reduce((a, b) => a + b, 0);
+
+      const workflowDNA = WORKFLOW_PHASES.map((phase) => ({
+        phase,
+        eventRatio: totalPhaseCount > 0
+          ? Math.round(((phaseCounts.get(phase) ?? 0) / totalPhaseCount) * 1000) / 10
+          : 0,
+        timeRatio: totalPhaseTime > 0
+          ? Math.round(((phaseTimeMs.get(phase) ?? 0) / totalPhaseTime) * 1000) / 10
+          : 0,
+      }));
+
+      // ─ Task Profile: 소요시간 분포 + 평균 크기
+      const durations: number[] = [];
+      let totalTaskEvents = 0;
+      let totalTaskFiles = 0;
+      for (const taskEvts of taskEvents.values()) {
+        if (taskEvts.length < 2) continue;
+        const t0 = new Date(taskEvts[0].timestamp).getTime();
+        const tN = new Date(taskEvts[taskEvts.length - 1].timestamp).getTime();
+        durations.push((tN - t0) / 1000);
+        totalTaskEvents += taskEvts.length;
+        const files = new Set(taskEvts.filter((e) => e.file).map((e) => e.file));
+        totalTaskFiles += files.size;
+      }
+      const durationBuckets = new Map<string, number>();
+      for (const dur of durations) {
+        const bucket = dur < 60 ? '<1m' : dur < 300 ? '1-5m' : dur < 600 ? '5-10m'
+          : dur < 1800 ? '10-30m' : dur < 3600 ? '30-60m' : '60m+';
+        durationBuckets.set(bucket, (durationBuckets.get(bucket) ?? 0) + 1);
+      }
+      const taskDurationDist = ['<1m', '1-5m', '5-10m', '10-30m', '30-60m', '60m+']
+        .map((bucket) => ({ bucket, count: durationBuckets.get(bucket) ?? 0 }));
+
+      const tasksWithDuration = durations.length;
+      const avgDurationMin = tasksWithDuration > 0
+        ? Math.round((durations.reduce((a, b) => a + b, 0) / tasksWithDuration / 60) * 10) / 10
+        : 0;
+      const avgEventsPerTask = tasksWithDuration > 0
+        ? Math.round((totalTaskEvents / tasksWithDuration) * 10) / 10
+        : 0;
+      const avgFilesPerTask = tasksWithDuration > 0
+        ? Math.round((totalTaskFiles / tasksWithDuration) * 10) / 10
+        : 0;
+
+      // ─ Hourly activity
+      const hourly = new Array(24).fill(0);
+      for (const e of events) {
+        hourly[parseInt(e.hour)]++;
+      }
+
+      // ─ Rule violations
+      const ruleViolations = new Map<string, number>();
+      let matchCount = 0;
+      let violationCount = 0;
+      let fixCount = 0;
+      for (const e of events) {
+        const kind = classifyRuleEvent(e.action, e.type);
+        if (kind === 'match') matchCount++;
+        if (kind === 'violation') {
+          violationCount++;
+          const ruleId = e.rule_id ?? 'unknown';
+          ruleViolations.set(ruleId, (ruleViolations.get(ruleId) ?? 0) + 1);
+        }
+        if (kind === 'fix') fixCount++;
+      }
+
+      const topViolatedRules = [...ruleViolations.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([ruleId, count]) => ({ ruleId, count }));
+
+      const complianceRate = matchCount > 0 ? 1 - violationCount / matchCount : 1;
+
+      return {
+        projectId: p.id,
+        projectName: p.name,
+        // Profile
+        profile: {
+          totalEvents,
+          totalTasks,
+          totalFiles: uniqueFiles.size,
+          ruleCount: ruleInfo?.group_count ?? 0,
+          itemCount: ruleInfo?.item_count ?? 0,
+          firstEventAt: firstEvent,
+          lastEventAt: lastEvent,
+          activeDays: dailyEvents.size,
+          avgEventsPerDay: dailyEvents.size > 0
+            ? Math.round(totalEvents / dailyEvents.size)
+            : 0,
+          dailySparkline: dailySparkline.slice(-30), // 최근 30일
+        },
+        // Workflow DNA
+        workflowDNA,
+        // Task Profile
+        taskProfile: {
+          avgDurationMin,
+          avgEventsPerTask,
+          avgFilesPerTask,
+          durationDistribution: taskDurationDist,
+        },
+        // Hourly Activity
+        hourlyActivity: hourly,
+        // Rule Compliance
+        ruleCompliance: {
+          matchCount,
+          violationCount,
+          fixCount,
+          complianceRate,
+          topViolatedRules,
+        },
+      };
+    });
+
+    // ─── 크로스 프로젝트 분석 ───
+
+    // 프로젝트별 일별 생산성 (겹친 라인 차트용)
+    const allDates = new Set<string>();
+    for (const p of projectData) {
+      for (const d of p.profile.dailySparkline) {
+        allDates.add(d.date);
+      }
+    }
+    const sortedDates = [...allDates].sort();
+    const productivityTimeline = sortedDates.map((date) => {
+      const entry: Record<string, unknown> = { date };
+      for (const p of projectData) {
+        const dayData = p.profile.dailySparkline.find((d) => d.date === date);
+        entry[p.projectName] = dayData?.count ?? 0;
+      }
+      return entry;
+    });
+
+    // 규칙 히트맵 (행: ruleId, 열: project, 셀: 위반 횟수)
+    const allRuleIds = new Set<string>();
+    const ruleViolationMap = new Map<string, Map<string, number>>(); // ruleId → projectId → count
+    for (const p of projectData) {
+      for (const r of p.ruleCompliance.topViolatedRules) {
+        allRuleIds.add(r.ruleId);
+      }
+    }
+    // 전체 이벤트에서 다시 집계 (top 5 외 규칙도 포함)
+    for (const e of allEvents) {
+      if (classifyRuleEvent(e.action, e.type) !== 'violation' || !e.rule_id) continue;
+      if (!ruleViolationMap.has(e.rule_id)) ruleViolationMap.set(e.rule_id, new Map());
+      const pm = ruleViolationMap.get(e.rule_id)!;
+      pm.set(e.project_id, (pm.get(e.project_id) ?? 0) + 1);
+    }
+    const ruleHeatmap = [...ruleViolationMap.entries()]
+      .map(([ruleId, projectMap]) => ({
+        ruleId,
+        total: [...projectMap.values()].reduce((a, b) => a + b, 0),
+        byProject: Object.fromEntries(projectMap),
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 15);
+
+    // 시간대 히트맵 (프로젝트 × 시간)
+    const hourlyHeatmap = projectData.map((p) => ({
+      projectId: p.projectId,
+      projectName: p.projectName,
+      hours: p.hourlyActivity,
+    }));
+
+    res.json({
+      projects: projectData,
+      productivityTimeline,
+      ruleHeatmap,
+      hourlyHeatmap,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ error: message });
+  }
+});
+
+// ─── 7. GET /insights ─────────────────────────────────
 
 analyticsRouter.get('/insights', (req, res) => {
   try {
