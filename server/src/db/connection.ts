@@ -21,6 +21,7 @@ db.exec(`
     name TEXT NOT NULL,
     description TEXT,
     rules_path TEXT NOT NULL,
+    agent TEXT NOT NULL DEFAULT 'claude_code',
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   );
@@ -575,6 +576,18 @@ if (needsBackfill.cnt > 0) {
     }
   }
   log('DB', `Backfill complete: updated ${filled} rules with item_count`);
+}
+
+// Migration: add agent column to projects (default 'claude_code')
+const hasAgentCol = db.prepare(
+  "SELECT COUNT(*) as cnt FROM pragma_table_info('projects') WHERE name='agent'"
+).get() as { cnt: number };
+if (hasAgentCol.cnt === 0) {
+  log('DB','Migrating: adding agent column to projects...');
+  db.exec(`
+    ALTER TABLE projects ADD COLUMN agent TEXT NOT NULL DEFAULT 'claude_code';
+  `);
+  log('DB','Migration complete: agent column added (defaulted to claude_code)');
 }
 
 // Analytics composite indexes for Phase 2 analysis queries

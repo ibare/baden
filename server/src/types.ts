@@ -55,11 +55,14 @@ export type Severity = 'critical' | 'high' | 'medium' | 'low';
 
 export type RuleCategory = 'always' | 'concerns' | 'specifics';
 
+export type AgentType = 'claude_code' | 'codex';
+
 export interface Project {
   id: string;
   name: string;
   description: string | null;
   rules_path: string | null;
+  agent: AgentType;
   created_at: string;
   updated_at: string;
 }

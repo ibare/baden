@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { FolderOpen, ArrowRight } from '@phosphor-icons/react';
 import type { ProjectInsight, DeepProjectData } from '@/lib/api';
+import { AgentBadge } from '@/components/domain/AgentBadge';
 import { TrendSparkline } from './TrendSparkline';
 
 interface ProjectInsightCardProps {
@@ -56,7 +57,8 @@ export function ProjectInsightCard({ insight, deep }: ProjectInsightCardProps) {
       <CardHeader className="pb-0 gap-1">
         <CardTitle className="flex items-center gap-2 text-sm">
           <FolderOpen size={16} className="text-muted-foreground" />
-          {project.name}
+          <span className="truncate">{project.name}</span>
+          <AgentBadge agent={project.agent} variant="full" className="ml-auto flex-shrink-0" />
         </CardTitle>
         {project.description && (
           <p className="text-xs text-muted-foreground truncate">{project.description}</p>

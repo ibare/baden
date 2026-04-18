@@ -6,6 +6,7 @@ import {
   BarChart, Bar,
 } from 'recharts';
 import { api, type DeepComparisonResponse, type DeepProjectData } from '@/lib/api';
+import { AgentBadge } from '@/components/domain/AgentBadge';
 
 const PROJECT_COLORS = [
   '#6366f1', '#f43f5e', '#10b981', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899',
@@ -186,11 +187,14 @@ export function ComparePage() {
             const color = getColor(allProjects, p);
             return (
               <div key={p.projectId} className="bg-card border border-border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm" style={{ color }}>
-                    {p.projectName}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
+                <div className="flex items-center justify-between mb-2 gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-medium text-sm truncate" style={{ color }}>
+                      {p.projectName}
+                    </span>
+                    <AgentBadge agent={p.agent} variant="icon" />
+                  </div>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
                     {p.profile.activeDays}d active
                   </span>
                 </div>

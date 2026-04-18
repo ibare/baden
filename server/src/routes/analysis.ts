@@ -30,8 +30,8 @@ analysisRouter.get('/insights', (_req, res) => {
   try {
     // 1. 프로젝트 목록
     const projects = db
-      .prepare('SELECT id, name, description FROM projects ORDER BY created_at DESC')
-      .all() as { id: string; name: string; description: string | null }[];
+      .prepare('SELECT id, name, description, agent FROM projects ORDER BY created_at DESC')
+      .all() as { id: string; name: string; description: string | null; agent: string }[];
 
     // 2. 프로젝트별 이벤트 통계
     const eventStats = db
@@ -129,7 +129,7 @@ analysisRouter.get('/insights', (_req, res) => {
       }
 
       return {
-        project: { id: p.id, name: p.name, description: p.description },
+        project: { id: p.id, name: p.name, description: p.description, agent: p.agent },
         stats: {
           totalEvents: stats?.total_events ?? 0,
           ruleCount: ruleCountMap.get(p.id) ?? 0,

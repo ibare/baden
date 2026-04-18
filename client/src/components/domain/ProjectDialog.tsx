@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
-import type { Project } from '@/lib/api';
+import type { AgentType, Project } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,19 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Plus } from '@phosphor-icons/react';
+
+const AGENT_OPTIONS: { value: AgentType; label: string }[] = [
+  { value: 'claude_code', label: 'Claude Code' },
+  { value: 'codex', label: 'Codex' },
+];
 
 interface ProjectDialogProps {
   /** 수정 모드: 기존 프로젝트 전달 시 편집 모드 */
@@ -46,6 +58,7 @@ export function ProjectDialog({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [rulesPath, setRulesPath] = useState('');
+  const [agent, setAgent] = useState<AgentType>('claude_code');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -55,11 +68,13 @@ export function ProjectDialog({
       setName(project.name);
       setDescription(project.description ?? '');
       setRulesPath(project.rules_path ?? '');
+      setAgent(project.agent ?? 'claude_code');
       setError('');
     } else if (open && !project) {
       setName('');
       setDescription('');
       setRulesPath('');
+      setAgent('claude_code');
       setError('');
     }
   }, [open, project]);
@@ -76,6 +91,7 @@ export function ProjectDialog({
           name: name.trim(),
           description: description.trim() || undefined,
           rulesPath: rulesPath.trim() || undefined,
+          agent,
         });
         setOpen(false);
         onUpdated?.(updated);
@@ -84,6 +100,7 @@ export function ProjectDialog({
           name: name.trim(),
           description: description.trim() || undefined,
           rulesPath: rulesPath.trim() || undefined,
+          agent,
         });
         setOpen(false);
         onCreated?.(created);
@@ -131,6 +148,21 @@ export function ProjectDialog({
             onChange={(e) => setRulesPath(e.target.value)}
             placeholder="/path/to/.cursor/rules (optional)"
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="project-agent">AI Agent</Label>
+          <Select value={agent} onValueChange={(v) => setAgent(v as AgentType)}>
+            <SelectTrigger id="project-agent" className="w-full">
+              <SelectValue placeholder="Select agent" />
+            </SelectTrigger>
+            <SelectContent>
+              {AGENT_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         {error && (
           <p className="text-sm text-destructive">{error}</p>

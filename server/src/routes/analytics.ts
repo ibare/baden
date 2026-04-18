@@ -753,8 +753,8 @@ analyticsRouter.get('/compare/deep', (req, res) => {
       ? projectIds.split(',').map((s) => s.trim())
       : null;
 
-    const projects = db.prepare('SELECT id, name FROM projects ORDER BY created_at DESC')
-      .all() as { id: string; name: string }[];
+    const projects = db.prepare('SELECT id, name, agent FROM projects ORDER BY created_at DESC')
+      .all() as { id: string; name: string; agent: string }[];
     const targetProjects = filterIds
       ? projects.filter((p) => filterIds.includes(p.id))
       : projects;
@@ -915,6 +915,7 @@ analyticsRouter.get('/compare/deep', (req, res) => {
       return {
         projectId: p.id,
         projectName: p.name,
+        agent: p.agent,
         // Profile
         profile: {
           totalEvents,

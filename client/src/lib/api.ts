@@ -12,11 +12,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export type AgentType = 'claude_code' | 'codex';
+
 export interface Project {
   id: string;
   name: string;
   description: string | null;
   rules_path: string | null;
+  agent: AgentType;
   created_at: string;
   updated_at: string;
 }
@@ -84,7 +87,7 @@ export interface DetailKeyword {
 }
 
 export interface ProjectInsight {
-  project: { id: string; name: string; description: string | null };
+  project: { id: string; name: string; description: string | null; agent: AgentType };
   stats: { totalEvents: number; ruleCount: number; lastActivityAt: string | null };
   categoryDistribution: { category: string; count: number }[];
   dailyTrend: { date: string; count: number }[];
@@ -341,6 +344,7 @@ export interface RuleComplianceData {
 export interface DeepProjectData {
   projectId: string;
   projectName: string;
+  agent: AgentType;
   profile: ProjectProfileData;
   workflowDNA: WorkflowDNAItem[];
   taskProfile: TaskProfileData;
@@ -383,10 +387,10 @@ export const api = {
   getEventDates: (projectId: string) =>
     request<{ date: string; count: number }[]>(`/events/dates?projectId=${projectId}`),
 
-  createProject: (data: { name: string; description?: string; rulesPath?: string }) =>
+  createProject: (data: { name: string; description?: string; rulesPath?: string; agent?: AgentType }) =>
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(data) }),
 
-  updateProject: (id: string, data: { name: string; description?: string; rulesPath?: string }) =>
+  updateProject: (id: string, data: { name: string; description?: string; rulesPath?: string; agent?: AgentType }) =>
     request<Project>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
 
   deleteProject: (id: string) =>

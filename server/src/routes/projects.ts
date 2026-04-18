@@ -5,13 +5,22 @@ import { nanoid } from 'nanoid';
 import db from '../db/connection.js';
 import { parseRules } from '../services/rule-parser.js';
 import { invalidatePrefixCache, invalidateKeywordCache, invalidateCache as invalidateRegistryCache } from '../services/action-registry.js';
-import type { Project, Rule } from '../types.js';
+import type { AgentType, Project, Rule } from '../types.js';
 
 export const projectsRouter = Router();
 
+const VALID_AGENTS: readonly AgentType[] = ['claude_code', 'codex'];
+
+function normalizeAgent(value: unknown): AgentType {
+  if (typeof value === 'string' && (VALID_AGENTS as readonly string[]).includes(value)) {
+    return value as AgentType;
+  }
+  return 'claude_code';
+}
+
 const insertProject = db.prepare(`
-  INSERT INTO projects (id, name, description, rules_path)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO projects (id, name, description, rules_path, agent)
+  VALUES (?, ?, ?, ?, ?)
 `);
 
 const insertRule = db.prepare(`
@@ -20,7 +29,7 @@ const insertRule = db.prepare(`
 `);
 
 const updateProject = db.prepare(`
-  UPDATE projects SET name = ?, description = ?, rules_path = ?, updated_at = datetime('now')
+  UPDATE projects SET name = ?, description = ?, rules_path = ?, agent = ?, updated_at = datetime('now')
   WHERE id = ?
 `);
 
@@ -31,7 +40,7 @@ const deleteRulesByProject = db.prepare(`
 // POST /api/projects - 프로젝트 등록
 projectsRouter.post('/', (req, res) => {
   try {
-    const { name, description, rulesPath } = req.body;
+    const { name, description, rulesPath, agent } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'name is required' });
@@ -39,9 +48,10 @@ projectsRouter.post('/', (req, res) => {
     }
 
     const id = `bdn_${nanoid(8)}`;
+    const agentValue = normalizeAgent(agent);
 
     // Insert project
-    insertProject.run(id, name, description || null, rulesPath || null);
+    insertProject.run(id, name, description || null, rulesPath || null, agentValue);
 
     // Parse and insert rules if rulesPath provided
     let parsedRules: ReturnType<typeof parseRules> = [];
@@ -65,6 +75,7 @@ projectsRouter.post('/', (req, res) => {
       id,
       name,
       rulesPath: rulesPath || null,
+      agent: agentValue,
       rules: parsedRules,
     });
   } catch (err: unknown) {
@@ -160,7 +171,7 @@ projectsRouter.get('/:id/rules/:ruleId/content', (req, res) => {
 // PUT /api/projects/:id - 프로젝트 정보 수정
 projectsRouter.put('/:id', (req, res) => {
   try {
-    const { name, description, rulesPath } = req.body;
+    const { name, description, rulesPath, agent } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'name is required' });
@@ -173,7 +184,8 @@ projectsRouter.put('/:id', (req, res) => {
       return;
     }
 
-    updateProject.run(name, description || null, rulesPath || null, req.params.id);
+    const agentValue = agent === undefined ? existing.agent : normalizeAgent(agent);
+    updateProject.run(name, description || null, rulesPath || null, agentValue, req.params.id);
 
     // Re-parse rules if rulesPath changed or rules are missing
     const newPath = rulesPath || null;
