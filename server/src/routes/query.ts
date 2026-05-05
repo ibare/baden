@@ -93,45 +93,46 @@ function inferEventType(action: string, _phase?: string, ruleId?: string): Event
   return 'query';
 }
 
-// POST /api/query - Query 프로토콜 수신
+// POST /api/query - Query 프로토콜 수신 (단건 또는 배열)
 queryRouter.post('/', (req, res) => {
   try {
-    const q: QueryInput = req.body;
+    const body = req.body;
+    const queries: QueryInput[] = Array.isArray(body) ? body : [body];
 
-    if (!q.action || !q.projectName) {
-      log('Query', `SKIP missing=${!q.action ? 'action' : 'projectName'} received=${JSON.stringify(q)}`);
-      res.json({ ok: true });
-      return;
+    for (const q of queries) {
+      if (!q.action || !q.projectName) {
+        log('Query', `SKIP missing=${!q.action ? 'action' : 'projectName'} received=${JSON.stringify(q)}`);
+        continue;
+      }
+
+      // Resolve projectId via projectName lookup
+      const projectId = getProjectIdByName(q.projectName);
+      if (!projectId) {
+        log('Query', `SKIP project="${q.projectName}" not registered action="${q.action}"`);
+        continue;
+      }
+
+      const eventType = inferEventType(q.action, q.phase, q.ruleId);
+      log('Query', `project="${q.projectName}" action="${q.action}" → ${eventType}${q.ruleId ? ` rule=${q.ruleId}` : ''}${q.target ? ` target=${q.target}` : ''}`);
+
+      const input: EventInput = {
+        type: eventType,
+        projectId,
+        step: q.phase,
+        action: q.action,
+        file: q.target,
+        message: q.reason,
+        detail: JSON.stringify(q),
+        ruleId: q.ruleId,
+        severity: q.severity as Severity | undefined,
+        agent: q.agent,
+        prompt: q.prompt,
+        summary: q.summary,
+        result: q.result,
+        taskId: q.taskId,
+      };
+      processEvent(input);
     }
-
-    // Resolve projectId via projectName lookup
-    const projectId = getProjectIdByName(q.projectName);
-    if (!projectId) {
-      log('Query', `SKIP project="${q.projectName}" not registered action="${q.action}"`);
-      res.json({ ok: true });
-      return;
-    }
-
-    const eventType = inferEventType(q.action, q.phase, q.ruleId);
-    log('Query', `project="${q.projectName}" action="${q.action}" → ${eventType}${q.ruleId ? ` rule=${q.ruleId}` : ''}${q.target ? ` target=${q.target}` : ''}`);
-
-    const input: EventInput = {
-      type: eventType,
-      projectId,
-      step: q.phase,
-      action: q.action,
-      file: q.target,
-      message: q.reason,
-      detail: JSON.stringify(q),
-      ruleId: q.ruleId,
-      severity: q.severity as Severity | undefined,
-      agent: q.agent,
-      prompt: q.prompt,
-      summary: q.summary,
-      result: q.result,
-      taskId: q.taskId,
-    };
-    processEvent(input);
 
     res.json({ ok: true });
   } catch (err: unknown) {
