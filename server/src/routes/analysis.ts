@@ -48,7 +48,7 @@ analysisRouter.get('/insights', (_req, res) => {
         `SELECT project_id,
                 COUNT(*) as group_count,
                 COALESCE(SUM(item_count), 0) as rule_count
-         FROM rules GROUP BY project_id`,
+         FROM rules WHERE status = 'active' GROUP BY project_id`,
       )
       .all() as { project_id: string; group_count: number; rule_count: number }[];
     const ruleCountMap = new Map(ruleCounts.map((r) => [r.project_id, r.rule_count]));

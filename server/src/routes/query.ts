@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { processEvent } from '../services/event-processor.js';
+import { maybeSyncRules } from '../services/rule-sync.js';
 import { getProjectIdByName } from '../db/connection.js';
 import { log, error as logError } from '../logger.js';
 import type { QueryInput, EventInput, EventType, Severity } from '../types.js';
@@ -98,6 +99,22 @@ queryRouter.post('/', (req, res) => {
   try {
     const body = req.body;
     const queries: QueryInput[] = Array.isArray(body) ? body : [body];
+
+    // 규칙을 참조하는 이벤트가 있으면 파일 변경을 한 번 확인한다.
+    // 배열 루프 밖에서 프로젝트당 1회만 — 루프 안에서 돌리면 한 항목의 파일 IO 실패가
+    // 나머지 이벤트까지 삼킨다. maybeSyncRules 자체가 스로틀·예외를 흡수한다.
+    try {
+      const syncTargets = new Set(
+        queries.filter((q) => q.ruleId && q.projectName).map((q) => q.projectName as string),
+      );
+      for (const projectName of syncTargets) {
+        const projectId = getProjectIdByName(projectName);
+        if (projectId) maybeSyncRules(projectId);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      logError('Query', `rule auto-sync skipped: ${message}`);
+    }
 
     for (const q of queries) {
       if (!q.action || !q.projectName) {

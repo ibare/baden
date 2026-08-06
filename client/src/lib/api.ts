@@ -24,6 +24,8 @@ export interface Project {
   updated_at: string;
 }
 
+export type RuleStatus = 'active' | 'removed';
+
 export interface Rule {
   id: string;
   project_id: string;
@@ -32,6 +34,18 @@ export interface Rule {
   description: string | null;
   triggers: string | null;
   content_hash: string | null;
+  status: RuleStatus;
+  removed_at: string | null;
+}
+
+/** rules 디렉토리 재스캔 diff */
+export interface RuleSyncResult {
+  added: string[];
+  updated: string[];
+  removed: string[];
+  renamed: { from: string; to: string }[];
+  restored: string[];
+  unchanged: string[];
 }
 
 export interface RuleEvent {
@@ -375,7 +389,15 @@ export const api = {
   getInsights: () => request<InsightsResponse>('/insights'),
   getProjects: () => request<Project[]>('/projects'),
   getProject: (id: string) => request<Project & { rules: Rule[] }>(`/projects/${id}`),
-  getRules: (projectId: string) => request<Rule[]>(`/projects/${projectId}/rules`),
+  /** includeRemoved: 삭제된 규칙까지 — 과거 이벤트를 규칙에 이어붙이려면 필요하다 */
+  getRules: (projectId: string, includeRemoved = false) =>
+    request<Rule[]>(`/projects/${projectId}/rules${includeRemoved ? '?includeRemoved=1' : ''}`),
+
+  syncRules: (projectId: string) =>
+    request<{ synced: number; rules: Rule[]; sync: RuleSyncResult }>(
+      `/projects/${projectId}/sync`,
+      { method: 'PUT' },
+    ),
   getRuleContent: (projectId: string, ruleId: string) =>
     request<{ title: string; body: string }>(`/projects/${projectId}/rules/${ruleId}/content`),
 

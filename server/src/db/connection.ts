@@ -590,6 +590,36 @@ if (hasAgentCol.cnt === 0) {
   log('DB','Migration complete: agent column added (defaulted to claude_code)');
 }
 
+// Migration: soft delete for rules (status/removed_at)
+// 주의: FK-repair 블록보다 반드시 뒤에 위치해야 한다.
+// repair는 rules를 컬럼 목록 없이 재생성하고 SELECT * 로 위치 기반 복사를 하므로,
+// 그 앞에서 컬럼을 추가하면 컬럼 수가 어긋난다.
+const hasRuleStatus = db.prepare(
+  "SELECT COUNT(*) as cnt FROM pragma_table_info('rules') WHERE name='status'"
+).get() as { cnt: number };
+if (hasRuleStatus.cnt === 0) {
+  log('DB','Migrating: adding status/removed_at columns to rules...');
+  db.exec(`
+    ALTER TABLE rules ADD COLUMN status TEXT NOT NULL DEFAULT 'active';
+    ALTER TABLE rules ADD COLUMN removed_at TEXT;
+  `);
+  log('DB','Migration complete: rules soft delete columns added');
+}
+
+// rename 추적: 옛 규칙 id → 현재 규칙 id 매핑
+db.exec(`
+  CREATE TABLE IF NOT EXISTS rule_aliases (
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    old_id TEXT NOT NULL,
+    new_id TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (project_id, old_id)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_rules_project_status ON rules(project_id, status);
+  CREATE INDEX IF NOT EXISTS idx_rule_aliases_new ON rule_aliases(project_id, new_id);
+`);
+
 // Analytics composite indexes for Phase 2 analysis queries
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_events_project_type ON events(project_id, type);

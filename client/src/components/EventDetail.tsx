@@ -271,7 +271,14 @@ export function EventDetail({ event, rule, ruleEventCount }: EventDetailProps) {
       <div className="flex flex-col p-4 text-sm overflow-y-auto">
         <SectionTitle>Rules</SectionTitle>
         <dl>
-          <Row label="Rule ID"><span className="font-mono text-xs">{rule.id}</span></Row>
+          <Row label="Rule ID">
+            <span className="font-mono text-xs">{rule.id}</span>
+            {rule.status === 'removed' && (
+              <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted text-muted-foreground align-middle">
+                삭제됨
+              </span>
+            )}
+          </Row>
           <Row label="Category">{rule.category}</Row>
           <Row label="File">
             <button

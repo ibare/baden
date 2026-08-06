@@ -67,6 +67,8 @@ export interface Project {
   updated_at: string;
 }
 
+export type RuleStatus = 'active' | 'removed';
+
 export interface Rule {
   id: string;
   project_id: string;
@@ -76,6 +78,24 @@ export interface Rule {
   triggers: string | null;
   content_hash: string | null;
   parsed_at: string;
+  status: RuleStatus;
+  removed_at: string | null;
+}
+
+/** rules 디렉토리 재스캔 결과 diff */
+export interface RuleSyncResult {
+  /** 새로 등장한 규칙 */
+  added: string[];
+  /** 내용 또는 메타데이터가 바뀐 규칙 */
+  updated: string[];
+  /** 사라진 규칙 (하드 삭제가 아니라 status='removed') */
+  removed: string[];
+  /** content_hash가 같은 채로 id만 바뀐 규칙 */
+  renamed: { from: string; to: string }[];
+  /** removed 상태였다가 다시 나타난 규칙 */
+  restored: string[];
+  /** 변화 없음 */
+  unchanged: string[];
 }
 
 export interface RuleEvent {

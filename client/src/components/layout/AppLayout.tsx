@@ -53,7 +53,8 @@ export function AppLayout() {
       setEventDates([]);
       return;
     }
-    api.getRules(selectedProject).then(setRules).catch(console.error);
+    // 삭제된 규칙까지 받는다 — 과거 이벤트의 규칙 상세가 열려야 한다
+    api.getRules(selectedProject, true).then(setRules).catch(console.error);
     api.getEventDates(selectedProject).then((dates) => {
       setEventDates(dates);
       const dateStrs = dates.map((d) => d.date);
@@ -63,6 +64,18 @@ export function AppLayout() {
         setSelectedDate(todayUTC());
       }
     }).catch(console.error);
+  }, [selectedProject]);
+
+  // 사이드바에서 규칙을 재싱크하면 목록을 다시 읽는다
+  useEffect(() => {
+    if (!selectedProject) return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ projectId: string }>).detail;
+      if (detail?.projectId !== selectedProject) return;
+      api.getRules(selectedProject, true).then(setRules).catch(console.error);
+    };
+    window.addEventListener('baden:rules-synced', handler);
+    return () => window.removeEventListener('baden:rules-synced', handler);
   }, [selectedProject]);
 
   // Load events when project or date changes

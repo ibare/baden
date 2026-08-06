@@ -1,5 +1,11 @@
 import { Router } from 'express';
 import db from '../db/connection.js';
+import {
+  resolveRuleId,
+  collectRuleIdChain,
+  getAliasMap,
+  getRemovedRuleIds,
+} from '../services/rule-sync.js';
 
 export const analyticsRouter = Router();
 
@@ -164,9 +170,23 @@ function buildRuleCountMap(rows: RuleEventRow[]): RuleCountMap {
 
 function getProjectRules(projectId: string) {
   return db.prepare(
-    'SELECT id, category, file_path, description, triggers, item_count FROM rules WHERE project_id = ?',
+    "SELECT id, category, file_path, description, triggers, item_count FROM rules WHERE project_id = ? AND status = 'active'",
   ).all(projectId) as RuleRow[];
 }
+
+/** 규칙 상세는 삭제된 규칙도 조회한다 — 과거 이벤트에서 도달하는 경로가 있다 */
+const selectRuleDetail = db.prepare(`
+  SELECT id, category, file_path, description, triggers, item_count, status
+  FROM rules WHERE id = ? AND project_id = ?
+`);
+
+const selectRuleDetailEvents = db.prepare(`
+  SELECT id, action, type, timestamp, file, message, severity, task_id,
+    strftime('%Y-W%W', timestamp) as week
+  FROM events
+  WHERE project_id = ? AND rule_id = ?
+  ORDER BY timestamp
+`);
 
 // ─── 1. GET /rules/effectiveness ────────────────────────
 
@@ -414,27 +434,25 @@ analyticsRouter.get('/rules/:ruleId', (req, res) => {
       return;
     }
 
-    const rule = db.prepare(
-      'SELECT id, category, file_path, description, triggers, item_count FROM rules WHERE id = ? AND project_id = ?',
-    ).get(ruleId, projectId) as RuleRow | undefined;
+    // 이름이 바뀐 규칙은 옛 id로 들어와도 현재 규칙으로 해석한다
+    const resolvedId = resolveRuleId(projectId, ruleId);
+    const rule = selectRuleDetail.get(resolvedId, projectId) as
+      (RuleRow & { status: string }) | undefined;
 
     if (!rule) {
       res.status(404).json({ error: 'Rule not found' });
       return;
     }
 
-    // action 기반 분류를 위해 원시 이벤트 조회
-    const ruleEvents = db.prepare(`
-      SELECT id, action, type, timestamp, file, message, severity, task_id,
-        strftime('%Y-W%W', timestamp) as week
-      FROM events
-      WHERE project_id = ? AND rule_id = ?
-      ORDER BY timestamp
-    `).all(projectId, ruleId) as {
-      id: string; action: string; type: string; timestamp: string;
-      file: string | null; message: string | null; severity: string | null;
-      task_id: string | null; week: string;
-    }[];
+    // action 기반 분류를 위해 원시 이벤트 조회. 옛 id로 쌓인 이벤트까지 모은다
+    const chainIds = collectRuleIdChain(projectId, resolvedId);
+    const ruleEvents = chainIds
+      .flatMap((id) => selectRuleDetailEvents.all(projectId, id) as {
+        id: string; action: string; type: string; timestamp: string;
+        file: string | null; message: string | null; severity: string | null;
+        task_id: string | null; week: string;
+      }[])
+      .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
     const counts = { match: 0, violation: 0, fix: 0 };
     const trendMap = new Map<string, { matches: number; violations: number; fixes: number }>();
@@ -543,6 +561,8 @@ analyticsRouter.get('/rules/:ruleId', (req, res) => {
         description: rule.description,
         triggers: rule.triggers ? JSON.parse(rule.triggers) : null,
         itemCount: rule.item_count,
+        removed: rule.status === 'removed',
+        aliases: chainIds.filter((id) => id !== rule.id),
       },
       stats: {
         matchCount: counts.match,
@@ -603,7 +623,7 @@ analyticsRouter.get('/compare', (req, res) => {
 
     // 프로젝트별 규칙 수
     const ruleCounts = db.prepare(
-      'SELECT project_id, COUNT(*) as group_count, COALESCE(SUM(item_count), 0) as item_count FROM rules GROUP BY project_id',
+      "SELECT project_id, COUNT(*) as group_count, COALESCE(SUM(item_count), 0) as item_count FROM rules WHERE status = 'active' GROUP BY project_id",
     ).all() as { project_id: string; group_count: number; item_count: number }[];
     const ruleMap = new Map(ruleCounts.map((r) => [r.project_id, r]));
 
@@ -787,7 +807,7 @@ analyticsRouter.get('/compare/deep', (req, res) => {
 
     // 프로젝트별 규칙 수
     const ruleCounts = db.prepare(
-      'SELECT project_id, COUNT(*) as group_count, COALESCE(SUM(item_count), 0) as item_count FROM rules GROUP BY project_id',
+      "SELECT project_id, COUNT(*) as group_count, COALESCE(SUM(item_count), 0) as item_count FROM rules WHERE status = 'active' GROUP BY project_id",
     ).all() as { project_id: string; group_count: number; item_count: number }[];
     const ruleMap = new Map(ruleCounts.map((r) => [r.project_id, r]));
 
@@ -890,6 +910,9 @@ analyticsRouter.get('/compare/deep', (req, res) => {
       }
 
       // ─ Rule violations
+      // 이름이 바뀐 규칙의 옛 id는 현재 id로 합산한다. 그러지 않으면 규칙 기준 집계와 숫자가 어긋난다
+      const aliasMap = getAliasMap(p.id);
+      const removedIds = getRemovedRuleIds(p.id);
       const ruleViolations = new Map<string, number>();
       let matchCount = 0;
       let violationCount = 0;
@@ -899,7 +922,8 @@ analyticsRouter.get('/compare/deep', (req, res) => {
         if (kind === 'match') matchCount++;
         if (kind === 'violation') {
           violationCount++;
-          const ruleId = e.rule_id ?? 'unknown';
+          const raw = e.rule_id ?? 'unknown';
+          const ruleId = aliasMap.get(raw) ?? raw;
           ruleViolations.set(ruleId, (ruleViolations.get(ruleId) ?? 0) + 1);
         }
         if (kind === 'fix') fixCount++;
@@ -908,7 +932,7 @@ analyticsRouter.get('/compare/deep', (req, res) => {
       const topViolatedRules = [...ruleViolations.entries()]
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
-        .map(([ruleId, count]) => ({ ruleId, count }));
+        .map(([ruleId, count]) => ({ ruleId, count, removed: removedIds.has(ruleId) }));
 
       const complianceRate = matchCount > 0 ? 1 - violationCount / matchCount : 1;
 
@@ -1044,16 +1068,25 @@ analyticsRouter.get('/insights', (req, res) => {
 
     // ─── 규칙 인사이트 ─────────────────────────────
 
+    // 이름이 바뀐 규칙의 옛 id를 현재 id로 모아야 규칙 기준 집계와 숫자가 맞는다
+    const aliasMap = getAliasMap(projectId);
+    const removedIds = getRemovedRuleIds(projectId);
+    const currentRuleId = (raw: string | null): string => {
+      const id = raw ?? 'unknown';
+      return aliasMap.get(id) ?? id;
+    };
+
     // (A) Violation Pattern Clustering
-    const violationPatterns = new Map<string, { rule: string; count: number; examples: string[] }>();
+    const violationPatterns = new Map<string, { rule: string; removed: boolean; count: number; examples: string[] }>();
     for (const e of allEvents) {
       if (classifyRuleEvent(e.action, e.type) !== 'violation' || !e.message) continue;
       // "MUST: <규칙 문구>" 또는 "MUST NOT: <규칙 문구>" 추출
       const match = e.message.match(/^(MUST NOT|MUST|PREFER):\s*(.+?)(?:\s*[—\-–]|$)/);
       const pattern = match ? match[2].trim().substring(0, 60) : e.message.substring(0, 60);
-      const key = `${e.rule_id ?? '_'}::${pattern}`;
+      const ruleId = currentRuleId(e.rule_id);
+      const key = `${ruleId}::${pattern}`;
       if (!violationPatterns.has(key)) {
-        violationPatterns.set(key, { rule: e.rule_id ?? 'unknown', count: 0, examples: [] });
+        violationPatterns.set(key, { rule: ruleId, removed: removedIds.has(ruleId), count: 0, examples: [] });
       }
       const entry = violationPatterns.get(key)!;
       entry.count++;
@@ -1069,7 +1102,7 @@ analyticsRouter.get('/insights', (req, res) => {
       if (classifyRuleEvent(e.action, e.type) !== 'violation' || !e.file) continue;
       if (!fileViolations.has(e.file)) fileViolations.set(e.file, new Map());
       const rm = fileViolations.get(e.file)!;
-      const ruleId = e.rule_id ?? 'unknown';
+      const ruleId = currentRuleId(e.rule_id);
       rm.set(ruleId, (rm.get(ruleId) ?? 0) + 1);
     }
     const hotspotFiles = [...fileViolations.entries()]
@@ -1077,6 +1110,7 @@ analyticsRouter.get('/insights', (req, res) => {
         file,
         totalViolations: [...ruleMap.values()].reduce((a, b) => a + b, 0),
         rules: Object.fromEntries(ruleMap),
+        removedRules: [...ruleMap.keys()].filter((id) => removedIds.has(id)),
       }))
       .sort((a, b) => b.totalViolations - a.totalViolations)
       .slice(0, 10);
@@ -1086,7 +1120,7 @@ analyticsRouter.get('/insights', (req, res) => {
     for (const e of allEvents) {
       if (classifyRuleEvent(e.action, e.type) !== 'violation' || !e.task_id || !e.rule_id) continue;
       if (!taskViolatedRules.has(e.task_id)) taskViolatedRules.set(e.task_id, new Set());
-      taskViolatedRules.get(e.task_id)!.add(e.rule_id);
+      taskViolatedRules.get(e.task_id)!.add(currentRuleId(e.rule_id));
     }
     const pairCount = new Map<string, number>();
     for (const rules of taskViolatedRules.values()) {
