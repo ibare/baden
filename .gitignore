@@ -21,7 +21,10 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 tasks/
- 
+
+# agent 작업 산출물
+.claude/plans/
+
 # OS
 .DS_Store
 Thumbs.db
