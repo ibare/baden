@@ -7,7 +7,9 @@ import {
   type AgentEfficiencyResponse,
   type AnalyticsInsightsResponse,
   type RuleQualityLabel,
+  type Rule,
 } from '@/lib/api';
+import { RuleSyncControl } from '@/components/domain/RuleSyncControl';
 import { ViolationTrendChart } from '@/components/analytics/ViolationTrendChart';
 import { RuleQualitySummary } from '@/components/analytics/RuleQualitySummary';
 import { RuleQualityTable } from '@/components/analytics/RuleQualityTable';
@@ -41,7 +43,10 @@ export function AnalysisPage() {
   const [quality, setQuality] = useState<RuleQualityResponse | null>(null);
   const [efficiency, setEfficiency] = useState<AgentEfficiencyResponse | null>(null);
   const [insights, setInsights] = useState<AnalyticsInsightsResponse | null>(null);
+  const [rules, setRules] = useState<Rule[]>([]);
   const [loading, setLoading] = useState(true);
+  /** 재싱크 후 분석 데이터를 다시 부르기 위한 트리거 */
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!projectId) return;
@@ -51,16 +56,24 @@ export function AnalysisPage() {
       api.getAnalyticsRuleQuality(projectId),
       api.getAnalyticsAgentEfficiency(projectId, { days: period || undefined }),
       api.getAnalyticsInsights(projectId, { days: period || undefined }),
+      api.getRules(projectId),
     ])
-      .then(([eff, qual, effic, ins]) => {
+      .then(([eff, qual, effic, ins, ruleList]) => {
         setEffectiveness(eff);
         setQuality(qual);
         setEfficiency(effic);
         setInsights(ins);
+        setRules(ruleList);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [projectId, period]);
+  }, [projectId, period, reloadKey]);
+
+  /** 규칙 파일을 마지막으로 읽은 시각 */
+  const lastSyncedAt = useMemo(() => {
+    if (rules.length === 0) return null;
+    return rules.reduce((latest, r) => (r.parsed_at > latest ? r.parsed_at : latest), rules[0].parsed_at);
+  }, [rules]);
 
   const aggregatedTrend = useMemo(() => {
     if (!effectiveness) return [];
@@ -171,13 +184,24 @@ export function AnalysisPage() {
             </section>
           )}
 
-          {/* Rule Table */}
-          {tableRules.length > 0 && (
-            <section className="bg-card border border-border rounded-lg p-4">
-              <h2 className="text-base font-medium mb-3">Rules</h2>
+          {/* Rule Table — 규칙이 없어도 섹션은 남긴다. 그때가 재싱크가 가장 필요한 순간이다 */}
+          <section className="bg-card border border-border rounded-lg p-4">
+            <div className="flex items-center justify-between gap-4 mb-3">
+              <h2 className="text-base font-medium">Rules</h2>
+              <RuleSyncControl
+                projectId={projectId}
+                lastSyncedAt={lastSyncedAt}
+                onSynced={() => setReloadKey((k) => k + 1)}
+              />
+            </div>
+            {tableRules.length > 0 ? (
               <RuleQualityTable rules={tableRules} projectId={projectId} />
-            </section>
-          )}
+            ) : (
+              <p className="text-sm text-muted-foreground py-6 text-center">
+                등록된 규칙이 없다. rules 디렉토리를 설정했다면 다시 읽어보라.
+              </p>
+            )}
+          </section>
         </>
       )}
 

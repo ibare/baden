@@ -34,6 +34,7 @@ export interface Rule {
   description: string | null;
   triggers: string | null;
   content_hash: string | null;
+  parsed_at: string;
   status: RuleStatus;
   removed_at: string | null;
 }

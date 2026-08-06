@@ -14,7 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { FolderOpen, Plus, PencilSimple, House, Trash, ArrowsLeftRight, ArrowsClockwise } from '@phosphor-icons/react';
+import { FolderOpen, Plus, PencilSimple, House, Trash, ArrowsLeftRight } from '@phosphor-icons/react';
 
 interface SidebarProps {
   projects: Project[];
@@ -40,33 +40,6 @@ export function Sidebar({
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [syncMessage, setSyncMessage] = useState<{ projectId: string; text: string } | null>(null);
-
-  const handleSync = async (project: Project) => {
-    setSyncingId(project.id);
-    try {
-      const { sync } = await api.syncRules(project.id);
-      const parts: string[] = [];
-      if (sync.added.length) parts.push(`추가 ${sync.added.length}`);
-      if (sync.updated.length) parts.push(`변경 ${sync.updated.length}`);
-      if (sync.renamed.length) parts.push(`이름변경 ${sync.renamed.length}`);
-      if (sync.removed.length) parts.push(`삭제 ${sync.removed.length}`);
-      if (sync.restored.length) parts.push(`복원 ${sync.restored.length}`);
-      setSyncMessage({
-        projectId: project.id,
-        text: parts.length ? parts.join(' · ') : '변경 없음',
-      });
-      // 규칙 목록을 들고 있는 화면에 갱신을 알린다
-      window.dispatchEvent(new CustomEvent('baden:rules-synced', { detail: { projectId: project.id } }));
-    } catch (err) {
-      console.error('Failed to sync rules:', err);
-      setSyncMessage({ projectId: project.id, text: '재싱크 실패' });
-    } finally {
-      setSyncingId(null);
-      setTimeout(() => setSyncMessage(null), 4000);
-    }
-  };
 
   const handleDelete = async () => {
     if (!deletingProject) return;
@@ -162,20 +135,6 @@ export function Sidebar({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleSync(p);
-                    }}
-                    disabled={syncingId === p.id}
-                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50"
-                    title="규칙 다시 읽기"
-                  >
-                    <ArrowsClockwise
-                      size={14}
-                      className={syncingId === p.id ? 'animate-spin' : undefined}
-                    />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
                       setEditingProject(p);
                     }}
                     className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
@@ -193,11 +152,6 @@ export function Sidebar({
                   >
                     <Trash size={14} />
                   </button>
-                </div>
-              )}
-              {!collapsed && syncMessage?.projectId === p.id && (
-                <div className="px-2 pb-1 text-[11px] text-muted-foreground truncate">
-                  {syncMessage.text}
                 </div>
               )}
             </div>

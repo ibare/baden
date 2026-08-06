@@ -66,18 +66,6 @@ export function AppLayout() {
     }).catch(console.error);
   }, [selectedProject]);
 
-  // 사이드바에서 규칙을 재싱크하면 목록을 다시 읽는다
-  useEffect(() => {
-    if (!selectedProject) return;
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ projectId: string }>).detail;
-      if (detail?.projectId !== selectedProject) return;
-      api.getRules(selectedProject, true).then(setRules).catch(console.error);
-    };
-    window.addEventListener('baden:rules-synced', handler);
-    return () => window.removeEventListener('baden:rules-synced', handler);
-  }, [selectedProject]);
-
   // Load events when project or date changes
   useEffect(() => {
     if (!selectedProject) return;
