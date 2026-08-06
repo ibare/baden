@@ -20,7 +20,9 @@ db.exec(`
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    rules_path TEXT NOT NULL,
+    -- nullable이어야 한다. 아래 "make rules_path nullable" 마이그레이션은
+    -- agent 컬럼이 없던 시절의 코드라, 신규 DB가 그 경로를 타면 컬럼 수가 어긋난다
+    rules_path TEXT,
     agent TEXT NOT NULL DEFAULT 'claude_code',
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
@@ -400,8 +402,14 @@ const rulesPathCol = db.prepare(
 ).get() as { notnull: number } | undefined;
 if (rulesPathCol && rulesPathCol.notnull === 1) {
   log('DB','Migrating: making rules_path nullable...');
+  // RENAME 직후 자식 테이블(events, rules)의 FK가 잠시 존재하지 않는 projects를 가리키므로
+  // 재구축 동안에는 FK 검사를 끈다. 다른 테이블 재구축 마이그레이션과 같은 패턴이다
+  db.pragma('foreign_keys = OFF');
   // legacy_alter_table = ON: RENAME 시 자식 테이블의 FK 참조를 자동 변경하지 않도록 방지
   db.pragma('legacy_alter_table = ON');
+  // 컬럼을 명시한다. SELECT * 위치 기반 복사는 projects에 컬럼이 하나만 늘어도 깨진다
+  // (agent 추가 시 실제로 깨졌다). agent는 이 마이그레이션을 타는 레거시 DB에 없을 수 있어
+  // 목록에서 빼고 DEFAULT에 맡긴다
   db.exec(`
     ALTER TABLE projects RENAME TO _projects_old;
     CREATE TABLE projects (
@@ -409,14 +417,17 @@ if (rulesPathCol && rulesPathCol.notnull === 1) {
       name TEXT NOT NULL,
       description TEXT,
       rules_path TEXT,
+      agent TEXT NOT NULL DEFAULT 'claude_code',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
-    INSERT INTO projects SELECT * FROM _projects_old;
+    INSERT INTO projects (id, name, description, rules_path, created_at, updated_at)
+      SELECT id, name, description, rules_path, created_at, updated_at FROM _projects_old;
     DROP TABLE _projects_old;
-    CREATE UNIQUE INDEX idx_projects_name_unique ON projects(name);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_name_unique ON projects(name);
   `);
   db.pragma('legacy_alter_table = OFF');
+  db.pragma('foreign_keys = ON');
   log('DB','Migration complete: rules_path is now nullable');
 }
 
