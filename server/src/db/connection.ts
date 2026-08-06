@@ -3,7 +3,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import crypto from 'crypto';
-import { log } from '../logger.js';
+import { log, warn } from '../logger.js';
 
 const badenHome = path.join(os.homedir(), '.baden');
 fs.mkdirSync(badenHome, { recursive: true });
@@ -386,15 +386,9 @@ if (hasKoreanLabels.cnt > 0) {
   log('DB','Migration complete: labels localized to English');
 }
 
-// Migration: add UNIQUE index on projects(name)
-const hasNameUniqueIdx = db.prepare(
-  "SELECT name FROM sqlite_master WHERE type='index' AND name='idx_projects_name_unique'"
-).get();
-if (!hasNameUniqueIdx) {
-  log('DB','Migrating: adding UNIQUE index on projects(name)...');
-  db.exec(`CREATE UNIQUE INDEX idx_projects_name_unique ON projects(name)`);
-  log('DB','Migration complete: projects(name) unique index added');
-}
+// projects(name) UNIQUE 인덱스는 파일 끝의 복구 블록에서 일원화해 다룬다.
+// 여기에 있던 블록은 sqlite_master를 인덱스 이름으로 전역 조회해서,
+// 인덱스가 _projects_old에 붙어 있어도 "존재함"으로 판정하는 결함이 있었다.
 
 // Migration: make rules_path nullable
 const rulesPathCol = db.prepare(
@@ -630,6 +624,88 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_rules_project_status ON rules(project_id, status);
   CREATE INDEX IF NOT EXISTS idx_rule_aliases_new ON rule_aliases(project_id, new_id);
 `);
+
+// Migration: 중단된 rules_path nullable 마이그레이션이 남긴 _projects_old 정리.
+// 과거 버전은 이 블록을 foreign_keys = OFF 없이 실행해 DROP 단계에서 죽었고,
+// 그 결과 고아 테이블과 거기 딸린 UNIQUE 인덱스가 남은 DB가 있다.
+const orphanProjectsTable = db.prepare(
+  "SELECT name FROM sqlite_master WHERE type='table' AND name='_projects_old'"
+).get() as { name: string } | undefined;
+
+if (orphanProjectsTable) {
+  // 실패해도 서버는 떠야 한다. 고아 테이블이 남는 편이 기동 불가보다 낫다
+  try {
+    interface OrphanRow {
+      id: string; name: string; description: string | null;
+      rules_path: string | null; created_at: string; updated_at: string;
+    }
+
+    log('DB','Migrating: cleaning up orphaned _projects_old...');
+
+    // DROP은 되돌릴 수 없으니 무엇을 버리는지 먼저 남긴다
+    const orphanRows = db.prepare(
+      'SELECT id, name, description, rules_path, created_at, updated_at FROM _projects_old'
+    ).all() as OrphanRow[];
+    const currentRows = db.prepare('SELECT id, name, rules_path FROM projects').all() as
+      { id: string; name: string; rules_path: string | null }[];
+    const currentById = new Map(currentRows.map((r) => [r.id, r]));
+
+    for (const row of orphanRows) {
+      const current = currentById.get(row.id);
+      if (!current) continue;
+      // 같은 id인데 내용이 다르면 현재 행이 이긴다. 조용히 넘기지 않는다
+      if (current.name !== row.name || current.rules_path !== row.rules_path) {
+        warn('DB',
+          `_projects_old differs from projects for ${row.id}: ` +
+          `name "${row.name}"→"${current.name}", rules_path "${row.rules_path}"→"${current.rules_path}"`);
+      }
+    }
+
+    db.pragma('foreign_keys = OFF');
+    // OR IGNORE는 제약 위반을 전부 삼킨다. 옮길 대상을 조건으로 명시한다
+    const recovered = db.prepare(`
+      INSERT INTO projects (id, name, description, rules_path, created_at, updated_at)
+      SELECT id, name, description, rules_path, created_at, updated_at FROM _projects_old
+      WHERE id NOT IN (SELECT id FROM projects)
+    `).run();
+    db.exec('DROP TABLE _projects_old');
+    // foreign_keys는 파일 끝에서 일괄 복구한다 (FK-repair 블록과 같은 규약)
+    log('DB',
+      `Migration complete: _projects_old removed (${orphanRows.length} rows, ${recovered.changes} recovered)`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    warn('DB', `Orphan _projects_old cleanup skipped: ${message}`);
+  }
+}
+
+// Migration: projects(name) UNIQUE 인덱스 확보.
+// 인덱스 이름을 전역 조회하면 _projects_old에 붙은 것까지 잡히므로 projects 자체를 본다
+const projectIndexes = db.prepare("SELECT name FROM pragma_index_list('projects')")
+  .all() as { name: string }[];
+if (!projectIndexes.some((i) => i.name === 'idx_projects_name_unique')) {
+  const dupes = db.prepare(
+    'SELECT name, GROUP_CONCAT(id) as ids, COUNT(*) as cnt FROM projects GROUP BY name HAVING cnt > 1'
+  ).all() as { name: string; ids: string; cnt: number }[];
+
+  if (dupes.length > 0) {
+    // 여기서 인덱스를 만들면 throw되어 서버가 못 뜬다. 정리는 운영자 몫으로 남긴다
+    warn('DB',
+      'Cannot restore projects(name) unique index — duplicate names: ' +
+      dupes.map((d) => `"${d.name}" (${d.ids})`).join(', '));
+  } else {
+    log('DB','Migrating: restoring projects(name) unique index...');
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_name_unique ON projects(name)');
+    // 인덱스 이름은 DB 전역이라, 고아 테이블이 아직 그 이름을 쥐고 있으면 위 문장이
+    // 조용히 no-op 된다. 실제로 붙었는지 확인하고 아니면 알린다
+    const restored = db.prepare("SELECT name FROM pragma_index_list('projects')")
+      .all() as { name: string }[];
+    if (restored.some((i) => i.name === 'idx_projects_name_unique')) {
+      log('DB','Migration complete: projects(name) unique index restored');
+    } else {
+      warn('DB','projects(name) unique index NOT restored — index name is held elsewhere');
+    }
+  }
+}
 
 // Analytics composite indexes for Phase 2 analysis queries
 db.exec(`
