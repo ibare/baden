@@ -35,21 +35,64 @@ Baden MCP Server ──HTTP POST──▶ /api/query ─── inferEventType() 
 git clone <repository-url> baden
 cd baden
 npm run build
+npm link          # `baden` 명령을 PATH 에 등록
 ```
 
-이 명령은 `client`, `server`, `mcp` 세 모듈을 모두 빌드한다.
+`npm run build` 는 `client`, `server`, `mcp` 세 모듈을 모두 빌드한다.
+`npm link` 를 생략하면 `baden` 대신 `node bin/baden.js` 로 실행해야 한다.
 
-### 2. 서버 실행
+### 2. 상시 서비스로 등록 (권장, macOS)
+
+```bash
+baden install
+```
+
+`~/Library/LaunchAgents/com.baden.server.plist` 를 생성하고 launchd 에 등록한다.
+
+- **로그인할 때마다 자동 실행** — 콘솔을 띄울 필요가 없다
+- **비정상 종료 시 자동 복구** — `KeepAlive` 로 launchd 가 되살린다
+- **프로세스 1개** — 서버가 `client/dist` 를 정적 서빙하므로 3800 하나면 충분하다
+
+MCP 서버가 `http://localhost:3800` 에 의존하므로, 상시 실행 상태여야 에이전트 보고가 유실되지 않는다.
+
+#### ⚠️ 서비스는 `dist` 를 실행한다
+
+`baden dev` 는 `tsx` 로 `src` 를 직접 실행하지만 **서비스는 빌드 산출물(`server/dist`)을 실행한다.**
+소스를 고쳤다면 반드시 아래를 거쳐야 서비스에 반영된다.
+
+```bash
+npm run build
+baden restart
+```
+
+`baden status` / `start` / `restart` / `install` 은 `dist` 가 `src` 보다 오래됐으면 경고한다.
+
+#### node 런타임 복사본
+
+launchd 는 로그인 셸을 거치지 않아 nvm 의 node 를 찾지 못한다.
+그래서 `baden install` 이 현재 node 를 `~/.baden/runtime/node` 로 복사하고, plist 가 이 고정 경로를 직접 실행한다.
+노드 버전을 바꿨다면 `baden install` 을 다시 실행해 복사본을 갱신한다.
+
+드물게 macOS 개인정보 보호(TCC)가 `~/Documents` 아래 접근을 막을 수 있다.
+그런 경우 `baden install` 이 `~/.baden/logs/launchd.log` 를 확인해 감지하고,
+`~/.baden/runtime/node` 에 "전체 디스크 접근" 권한을 부여하는 절차를 출력한다.
+
+> 프로젝트 디렉터리를 옮기면 plist 에 기록된 진입점 경로가 깨진다.
+> `baden status` 가 이를 감지해 알려주며, `baden install` 을 다시 실행하면 된다.
+
+해제는 `baden uninstall`.
+
+### 3. 서비스 없이 실행
 
 ```bash
 # 데몬으로 실행 (백그라운드)
-node bin/baden.js start
+baden start
 
 # 포트 지정
-node bin/baden.js start -p 4000
+baden start -p 4000
 
 # 포그라운드 실행 (디버깅용)
-node bin/baden.js run
+baden run
 ```
 
 서버가 시작되면:
@@ -59,23 +102,40 @@ node bin/baden.js run
 - **DB**: `~/.baden/baden.db` (자동 생성)
 - **로그**: `~/.baden/logs/` (날짜별 로테이션)
 
-### 3. CLI 명령어
+### 4. CLI 명령어
 
 | 명령어 | 설명 |
 |--------|------|
-| `baden start [-p port]` | 데몬 시작 (기본 포트 3800) |
-| `baden stop` | 데몬 중지 |
-| `baden status` | 실행 상태 확인 |
+| `baden install [-p port]` | LaunchAgent 등록 — 로그인 시 자동 실행 |
+| `baden uninstall` | LaunchAgent 제거 |
+| `baden start [-p port]` | 시작 (등록돼 있으면 서비스, 아니면 데몬) |
+| `baden stop` | 중지 |
+| `baden restart` | 재시작 |
+| `baden status` | 실행 상태 및 헬스체크 |
+| `baden dev` | 개발 모드 (hot reload) |
 | `baden logs` | 최신 로그 tail |
 | `baden run [-p port]` | 포그라운드 실행 |
 
-### 4. 개발 모드
+`start` / `stop` / `status` 는 LaunchAgent 등록 여부를 먼저 확인해 `launchctl` 로 위임한다.
+데몬과 서비스가 동시에 3800 과 `baden.db` 를 잡는 일이 없다.
+
+### 5. 개발 모드
 
 ```bash
-# 서버 (hot reload)
-npm run dev:server    # http://localhost:3800
+baden dev
+```
 
-# 클라이언트 (Vite dev server)
+상시 서비스를 잠시 정지하고 hot reload 서버를 띄운다.
+
+- 서버: http://localhost:3800 (tsx watch — `src` 를 직접 실행)
+- 클라이언트: http://localhost:3801 (Vite)
+
+**Ctrl+C 로 종료하면 서비스가 자동으로 복귀한다.** 자식 프로세스는 그룹째 정리되므로 고아가 남지 않는다.
+
+개별 실행이 필요하면:
+
+```bash
+npm run dev:server    # http://localhost:3800
 npm run dev:client    # http://localhost:3801
 ```
 
