@@ -1,49 +1,51 @@
+**English** | [한국어](./baden-rules-bootstrap-guide-codex.ko.md)
+
 # Baden Rules Bootstrap Guide for Codex
 
-Codex 기반 프로젝트에서 규칙 기반 AI 에이전트 개발 파이프라인과 Baden 보고 체계를 구축하기 위한 표준 지침.
+Standard guidelines for building a rule-based AI agent development pipeline and a Baden reporting system in Codex-based projects.
 
-이 문서는 다음 전제를 기반으로 한다.
+This document is based on the following assumptions.
 
-- 프로젝트 지침의 진입점은 `AGENTS.md` 이다.
-- 역할 분리는 Codex custom agents로 구성한다.
-- 반복 절차는 Codex skills로 패키징할 수 있다.
-- 실행 권한과 네트워크 범위는 approvals / sandbox / MCP 설정으로 통제한다.
-- Claude Code hooks 같은 자동 라이프사이클 훅은 전제하지 않는다.
-- 따라서 보고와 검증은 **명시적 워크플로우**로 운영한다.
-
----
-
-## 왜 Rules인가
-
-AI 코딩 에이전트는 코드를 실제로 읽지 않고 추론으로 대체하며, 자기가 규칙을 따랐다고 스스로 확신한다. 문서는 코드와 괴리가 생기고 유지보수 자체가 부담이 된다. 코드가 스스로를 설명하게 하려면 일관된 품질과 구조가 필요하고, 그 일관성을 유지하는 뼈대가 규칙이다.
-
-단, 규칙이 커버하는 영역은 명확히 구분해야 한다.
-
-- **정적 분석 도구**  
-  기계적으로 검증 가능한 것  
-  예: unused imports, formatting, naming conventions, type checking
-
-- **Rules (이 시스템)**  
-  의미와 맥락이 필요한 것  
-  예: 설계 패턴 준수, 도메인 로직 제약, 의존성 방향, 아키텍처 원칙
-
-정적 분석 도구가 잡을 수 있는 것은 정적 분석에 맡긴다. 빠르고, 싸고, 100% 일관되고, 누락이 없다. Rules는 LLM만이 판단할 수 있는 영역에 집중한다.
+- The entry point for project instructions is `AGENTS.md`.
+- Role separation is set up with Codex custom agents.
+- Repeated procedures can be packaged as Codex skills.
+- Execution permissions and network scope are controlled through approvals / sandbox / MCP settings.
+- Automatic lifecycle hooks such as Claude Code hooks are not assumed.
+- Therefore, reporting and verification are run as an **explicit workflow**.
 
 ---
 
-## Codex 운영 원칙
+## Why Rules
 
-1. 프로젝트 전역 지침은 `AGENTS.md`에 둔다.
-2. 규칙 자체는 `rules/` 디렉터리에 둔다.
-3. 구현과 검증 역할은 분리한다.
-4. 수정 전 검토와 수정 후 검증을 모두 수행한다.
-5. 가능하면 Baden에 계획과 행동을 보고한다.
-6. hooks에 의존하지 않고, **항상 명시적으로** 검증과 보고를 호출한다.
-7. approvals / sandbox 설정은 최소 권한 원칙으로 운영한다.
+AI coding agents substitute inference for actually reading code, and convince themselves that they followed the rules. Documentation drifts away from the code, and maintaining it becomes a burden in itself. For code to explain itself, it needs consistent quality and structure, and rules are the backbone that keeps that consistency.
+
+However, the area covered by rules must be clearly delimited.
+
+- **Static analysis tools**  
+  Things that can be verified mechanically  
+  e.g., unused imports, formatting, naming conventions, type checking
+
+- **Rules (this system)**  
+  Things that require meaning and context  
+  e.g., design pattern compliance, domain logic constraints, dependency direction, architectural principles
+
+Leave whatever static analysis tools can catch to static analysis. It is fast, cheap, 100% consistent, and misses nothing. Rules focus on areas that only an LLM can judge.
 
 ---
 
-## 표준 디렉터리 구조
+## Codex Operating Principles
+
+1. Put project-wide instructions in `AGENTS.md`.
+2. Put the rules themselves in the `rules/` directory.
+3. Separate implementation and verification roles.
+4. Perform both pre-change review and post-change verification.
+5. Report plans and actions to Baden whenever possible.
+6. Do not rely on hooks; **always explicitly** invoke verification and reporting.
+7. Operate approvals / sandbox settings on the principle of least privilege.
+
+---
+
+## Standard Directory Structure
 
 ```text
 .
@@ -63,11 +65,11 @@ AI 코딩 에이전트는 코드를 실제로 읽지 않고 추론으로 대체�
 │   ├── INDEX.yaml
 │   ├── principles.md
 │   ├── concerns/
-│   │   ├── C1-{이름}.md
-│   │   ├── C2-{이름}.md
+│   │   ├── C1-{name}.md
+│   │   ├── C2-{name}.md
 │   │   └── ...
 │   ├── specifics/
-│   │   ├── S-{도메인}.md
+│   │   ├── S-{domain}.md
 │   │   └── ...
 │   ├── _analysis.md
 │   ├── _audit-v1.md
@@ -78,388 +80,388 @@ AI 코딩 에이전트는 코드를 실제로 읽지 않고 추론으로 대체�
 
 ---
 
-# Phase 1: 프로젝트 분석
+# Phase 1: Project Analysis
 
-## 1-1. 구조 파악
+## 1-1. Understand the Structure
 
-프로젝트의 전체 구조를 파악한다. 아래 항목을 조사해 `rules/_analysis.md`에 기록한다.
+Understand the overall structure of the project. Investigate the items below and record them in `rules/_analysis.md`.
 
 ```markdown
-## 프로젝트 구조 분석
+## Project Structure Analysis
 
-### 기본 정보
-- 언어:
-- 주요 프레임워크/라이브러리:
-- 모노레포 여부:
-- 모듈/패키지/앱 목록:
-- 빌드 시스템:
-- 테스트 프레임워크:
-- 사용 중인 정적 분석 도구:
+### Basic Information
+- Language:
+- Major frameworks/libraries:
+- Monorepo:
+- List of modules/packages/apps:
+- Build system:
+- Test framework:
+- Static analysis tools in use:
 
-### 규모
-- 소스 파일 수:
-- 대략적 코드 라인 수:
-- DB 모델/테이블 수 (해당 시):
-- API 엔드포인트 수 (해당 시):
+### Scale
+- Number of source files:
+- Approximate lines of code:
+- Number of DB models/tables (if applicable):
+- Number of API endpoints (if applicable):
 
-### 핵심 도메인
-- 도메인 1: (설명)
-- 도메인 2: (설명)
+### Core Domains
+- Domain 1: (description)
+- Domain 2: (description)
 - ...
 ```
 
-## 1-2. 패턴 탐색
+## 1-2. Explore Patterns
 
-코드베이스에서 반복되는 패턴과 안티패턴을 탐색한다. 프로젝트의 주 언어에 맞는 도구와 검색 패턴을 사용한다.
+Explore recurring patterns and anti-patterns in the codebase. Use tools and search patterns suited to the project's primary language.
 
 ```bash
-# 디렉터리 구조 파악
-find . -type f -name "*.{주 언어 확장자}" | head -100
+# Understand the directory structure
+find . -type f -name "*.{primary language extension}" | head -100
 
-# import / dependency 패턴
-grep -r "import\|require\|include\|use\|from" --include="*.{확장자}" | head -50
+# import / dependency patterns
+grep -r "import\|require\|include\|use\|from" --include="*.{extension}" | head -50
 
-# 인스턴스 생성 패턴 (싱글턴 위반 후보)
-grep -rn "new \|::new\|\.create(\|getInstance\|\.build(" --include="*.{확장자}" | head -30
+# Instance creation patterns (singleton violation candidates)
+grep -rn "new \|::new\|\.create(\|getInstance\|\.build(" --include="*.{extension}" | head -30
 
-# 에러 처리 패턴
-grep -rn "try\|catch\|except\|rescue\|throw\|raise\|panic" --include="*.{확장자}" | head -30
+# Error handling patterns
+grep -rn "try\|catch\|except\|rescue\|throw\|raise\|panic" --include="*.{extension}" | head -30
 
-# public API / export 패턴
-grep -rn "export\|public\|pub fn\|module\.exports\|__all__" --include="*.{확장자}" | head -30
+# public API / export patterns
+grep -rn "export\|public\|pub fn\|module\.exports\|__all__" --include="*.{extension}" | head -30
 ```
 
-관찰 결과를 `rules/_analysis.md`에 추가한다.
+Add your observations to `rules/_analysis.md`.
 
 ```markdown
-### 발견된 공통 패턴
-- (예: DB 클라이언트를 각 파일에서 직접 생성하고 있음)
-- (예: 에러를 catch 후 로깅만 하고 재전파하지 않음)
-- (예: 설정값이 여러 파일에 하드코딩되어 있음)
+### Common Patterns Found
+- (e.g., each file creates its own DB client directly)
+- (e.g., errors are caught and only logged, never re-propagated)
+- (e.g., configuration values are hardcoded across multiple files)
 
-### 발견된 안티패턴
-- (예: 핸들러/컨트롤러에 비즈니스 로직이 200줄 이상 직접 작성됨)
-- (예: 동일 기능의 유틸 함수가 여러 곳에 중복 구현됨)
+### Anti-patterns Found
+- (e.g., 200+ lines of business logic written directly in handlers/controllers)
+- (e.g., utility functions with the same functionality duplicated in multiple places)
 ```
 
-## 1-3. 정적 분석 현황 확인
+## 1-3. Check the Current Static Analysis Setup
 
-프로젝트에서 사용 중인 정적 분석 도구의 설정을 확인하고, 기계적으로 커버되는 영역을 파악한다. 정적 분석으로 커버되는 항목은 Rules에 중복 작성하지 않는다.
+Check the configuration of the static analysis tools used in the project and identify what is covered mechanically. Do not duplicate items covered by static analysis in Rules.
 
-정적 분석 도구가 아직 없다면 프로젝트 언어에 맞는 도구 도입을 권장한다. 기계적 검증은 기계에 맡기는 것이 원칙이다.
+If there are no static analysis tools yet, adopting tools suited to the project's language is recommended. The principle is to leave mechanical verification to machines.
 
 ---
 
-# Phase 2: 규칙 체계 설계
+# Phase 2: Rule System Design
 
-## 디렉터리 구조
+## Directory Structure
 
 ```text
 rules/
 ├── INDEX.yaml
 ├── principles.md
 ├── concerns/
-│   ├── C1-{이름}.md
-│   ├── C2-{이름}.md
+│   ├── C1-{name}.md
+│   ├── C2-{name}.md
 │   └── ...
 ├── specifics/
-│   ├── S-{도메인}.md
+│   ├── S-{domain}.md
 │   └── ...
 └── _analysis.md
 ```
 
-## 3 Tier 구조
+## 3-Tier Structure
 
 ### Tier 1 — Principles (`principles.md`)
 
-모든 코드에 항상 적용되는 핵심 원칙. 6개 이하로 유지한다.
+Core principles that always apply to all code. Keep them to 6 or fewer.
 
-예시:
+Example:
 
 ```markdown
 # Principles
 
-## 1. 단일 책임
-- 하나의 함수/클래스/모듈은 하나의 역할만 수행한다
+## 1. Single Responsibility
+- A function/class/module performs only one role
 
-## 2. 의존성 방향
-- 상위 모듈이 하위 모듈을 의존한다. 역방향 금지.
+## 2. Dependency Direction
+- Higher-level modules depend on lower-level modules. The reverse direction is forbidden.
 
-## 3. 공유 인스턴스 재사용
-- 싱글턴/공유 객체로 관리되는 인스턴스를 직접 생성하지 않는다
+## 3. Reuse Shared Instances
+- Do not directly create instances that are managed as singletons/shared objects
 
-## 4. 중앙 집중 관리
-- 설정, 상수, 에러코드는 중앙에서 관리한다
+## 4. Centralized Management
+- Configuration, constants, and error codes are managed centrally
 
-## 5. 최소 범위 변경
-- 수정은 필요한 범위로 최소화한다. 부수효과 금지.
+## 5. Minimal-Scope Changes
+- Keep changes to the minimum necessary scope. No side effects.
 
-## 6. 타입/계약 안전
-- 함수의 입출력 계약을 명확히 한다. 암묵적 변환이나 동적 타입 남용 금지.
+## 6. Type/Contract Safety
+- Make function input/output contracts explicit. No implicit conversions or abuse of dynamic typing.
 ```
 
 ### Tier 2 — Concerns (`concerns/C*.md`)
 
-횡단 관심사 규칙.
+Rules for cross-cutting concerns.
 
 ```markdown
 ---
 version: 1
-last_verified: (날짜)
+last_verified: (date)
 ---
 
-# (규칙 이름) (ID)
+# (Rule name) (ID)
 
 ## When to Apply
-(이 규칙이 적용되는 상황)
+(Situations where this rule applies)
 
 ## MUST
-- (반드시 해야 하는 것)
+- (What must be done)
 
 ## MUST NOT
-- (절대 하면 안 되는 것)
+- (What must never be done)
 
 ## PREFER
-- (권장 사항, 위반 판정 대상 아님)
+- (Recommendations; not subject to violation judgment)
 ```
 
 ### Tier 3 — Specifics (`specifics/S-*.md`)
 
-특정 도메인 또는 특정 기술에만 적용되는 규칙. 같은 형식을 따른다.
+Rules that apply only to a specific domain or a specific technology. They follow the same format.
 
-## INDEX.yaml 설계
+## INDEX.yaml Design
 
-트리거 매핑 파일. 어떤 파일을 수정할 때 어떤 규칙을 로드할지 정의한다.
+The trigger mapping file. It defines which rules to load when modifying which files.
 
 ```yaml
 # rules/INDEX.yaml
-# Rule Registry — 트리거 조건에 따라 로드할 규칙 결정
+# Rule Registry — decides which rules to load based on trigger conditions
 #
 # Trigger types:
-#   paths:    파일 경로 glob 패턴
-#   patterns: 코드에서 발견되는 문자열/정규식
-#   imports:  import/include/require 문에 포함된 모듈명
-#   events:   작업 유형 (create-file, rename-file 등)
+#   paths:    file path glob patterns
+#   patterns: strings/regexes found in code
+#   imports:  module names in import/include/require statements
+#   events:   task types (create-file, rename-file, etc.)
 
 # ─────────────────────────────────────
 # Always loaded
 # ─────────────────────────────────────
 always:
   - file: principles.md
-    description: 모든 코드에 적용되는 핵심 원칙
+    description: Core principles applied to all code
 
 # ─────────────────────────────────────
 # Concerns (Cross-cutting)
 # ─────────────────────────────────────
 concerns:
   - id: C1
-    file: concerns/C1-{이름}.md
-    description: (설명)
+    file: concerns/C1-{name}.md
+    description: (description)
     triggers:
       events: [create-file, rename-file]
-      patterns: ["(프로젝트에 맞는 패턴)"]
+      patterns: ["(pattern suited to the project)"]
 
 # ─────────────────────────────────────
 # Specifics (Domain-specific)
 # ─────────────────────────────────────
 specifics:
-  - id: S-{도메인}
-    file: specifics/S-{도메인}.md
-    description: (설명)
+  - id: S-{domain}
+    file: specifics/S-{domain}.md
+    description: (description)
     triggers:
-      paths: ["**/해당/경로/**"]
-      imports: ["(관련 모듈명)"]
+      paths: ["**/relevant/path/**"]
+      imports: ["(related module name)"]
 ```
 
 ---
 
-# Phase 3: 규칙 작성
+# Phase 3: Writing Rules
 
-## 3-1. Principles 작성
+## 3-1. Write Principles
 
-Phase 1 분석 결과를 바탕으로 프로젝트에 맞는 핵심 원칙을 작성한다. 6개 이하로 유지한다. 기존 코드에서 이미 따르고 있는 좋은 패턴을 원칙으로 격상시킨다.
+Based on the Phase 1 analysis, write core principles suited to the project. Keep them to 6 or fewer. Elevate good patterns that the existing code already follows into principles.
 
-## 3-2. Concerns 작성
+## 3-2. Write Concerns
 
-횡단 관심사를 식별한다. 일반적으로 다음 영역에서 나온다.
+Identify cross-cutting concerns. They typically come from the following areas.
 
-- 파일/디렉터리 구조와 네이밍
-- 공유 자원 관리
-- 에러 처리와 전파
-- 하드코딩 금지
-- 로깅과 모니터링
-- 보안
-- 테스트 작성 원칙
+- File/directory structure and naming
+- Shared resource management
+- Error handling and propagation
+- No hardcoding
+- Logging and monitoring
+- Security
+- Test-writing principles
 
-각 Concern에 대해:
+For each Concern:
 
-1. 코드베이스에서 관련 패턴을 검색으로 조사
-2. 좋은 패턴과 안티패턴 수집
-3. MUST / MUST NOT 으로 명문화
-4. INDEX.yaml에 트리거 조건 등록
+1. Investigate related patterns in the codebase via search
+2. Collect good patterns and anti-patterns
+3. Codify them as MUST / MUST NOT
+4. Register trigger conditions in INDEX.yaml
 
-## 3-3. Specifics 작성
+## 3-3. Write Specifics
 
-도메인별 규칙을 작성한다.
+Write rules per domain.
 
-1. 해당 도메인 코드를 읽고 설계 패턴 파악
-2. 도메인 고유 제약사항을 MUST / MUST NOT으로 정의
-3. INDEX.yaml에 paths / imports / patterns 트리거 등록
+1. Read the domain's code and identify its design patterns
+2. Define domain-specific constraints as MUST / MUST NOT
+3. Register paths / imports / patterns triggers in INDEX.yaml
 
-## 작성 원칙
+## Writing Principles
 
-- **MUST / MUST NOT만 검증 대상이다.** PREFER는 권장일 뿐 위반으로 판정하지 않는다.
-- **정적 분석 도구가 잡을 수 있는 것은 쓰지 않는다.** 의미와 맥락이 필요한 것만 쓴다.
-- **구체적으로 쓴다.** "좋은 코드를 작성하라"가 아니라 "핸들러에 50줄 이상의 비즈니스 로직을 직접 작성하지 마라"로 쓴다.
-- **코드베이스의 현실을 반영한다.** 이상적인 규칙이 아니라 이 프로젝트에서 실제로 지켜야 하는 것을 쓴다.
-- **규칙 수를 통제한다.** Concern 9개 이하, Specific은 핵심 도메인만.
+- **Only MUST / MUST NOT are subject to verification.** PREFER is only a recommendation and is never judged as a violation.
+- **Do not write what static analysis tools can catch.** Write only what requires meaning and context.
+- **Be specific.** Not "write good code" but "do not write more than 50 lines of business logic directly in a handler."
+- **Reflect the reality of the codebase.** Write not idealized rules but what actually must be followed in this project.
+- **Keep the number of rules under control.** 9 or fewer Concerns; Specifics for core domains only.
 
 ---
 
-# Phase 4: 초기 감사 (Audit)
+# Phase 4: Initial Audit
 
-규칙 작성 완료 후 현재 코드베이스를 전수 감사한다.
+After the rules are written, audit the entire current codebase.
 
-## 4-1. 감사 계획
+## 4-1. Audit Plan
 
 ```markdown
-## AUDIT-v1 계획
+## AUDIT-v1 Plan
 
-### 목적
-rules/ 규칙 기준으로 전체 코드베이스의 현재 준수율을 측정한다.
+### Purpose
+Measure the current compliance rate of the entire codebase against the rules/ rules.
 
-### 감사 범위
-전수 감사. 모든 소스 파일을 대상으로 한다.
+### Audit Scope
+Full audit. Covers all source files.
 
-### 배치 분할
+### Batch Split
 - Batch 1: Principles + Concerns C1~C(n)
 - Batch 2: Specifics S-*
-- (필요시 추가 배치)
+- (Additional batches if needed)
 
-### 세션 전략
-배치당 1세션. 감사 결과는 rules/_audit-v1.md에 기록한다.
+### Session Strategy
+One session per batch. Record audit results in rules/_audit-v1.md.
 ```
 
-## 4-2. 감사 실행
+## 4-2. Run the Audit
 
-각 배치에서:
+In each batch:
 
-1. 해당 규칙 파일을 읽는다
-2. 관련 코드를 검색으로 전수 확인한다
-3. MUST / MUST NOT 위반을 기록한다
-4. 위반마다 severity를 판정한다  
+1. Read the relevant rule files
+2. Check all related code exhaustively via search
+3. Record MUST / MUST NOT violations
+4. Assign a severity to each violation  
    `Critical / High / Medium / Low`
 
-## 4-3. 감사 결과 형식
+## 4-3. Audit Result Format
 
 ```markdown
-## AUDIT-v1 결과
+## AUDIT-v1 Results
 
-### 요약
-- 총 위반: X건
-- Critical: X건 / High: X건 / Medium: X건 / Low: X건
-- 준수율: X%
+### Summary
+- Total violations: X
+- Critical: X / High: X / Medium: X / Low: X
+- Compliance rate: X%
 
-### 위반 목록
-| # | 규칙 | 파일 | Severity | 내용 |
+### Violation List
+| # | Rule | File | Severity | Details |
 |---|------|------|:--------:|------|
-| 1 | C2 | (파일 경로) | High | (위반 내용) |
-| 2 | S-api | (파일 경로) | Medium | (위반 내용) |
+| 1 | C2 | (file path) | High | (violation details) |
+| 2 | S-api | (file path) | Medium | (violation details) |
 ```
 
-## 4-4. 예외 판정
+## 4-4. Exception Decisions
 
-예외는 해당 규칙 파일에 `Exception` 섹션으로 명시한다.
+State exceptions explicitly in an `Exception` section of the relevant rule file.
 
-- 프레임워크/라이브러리 요구 패턴
-- 성능 이유의 의도적 설계
-- 마이그레이션 비용이 가치를 초과하는 경우
+- Patterns required by a framework/library
+- Intentional design for performance reasons
+- Cases where migration cost exceeds the value
 
 ---
 
-# Phase 5: 리팩토링
+# Phase 5: Refactoring
 
-감사 결과를 바탕으로 위반을 해소한다.
+Resolve violations based on the audit results.
 
-## 5-1. Track 분할
+## 5-1. Track Split
 
 ```markdown
-Track A: 기계적 수정
-Track B: 구조 수정
-Track C: 도메인 수정
-Track D: 최종 감사 (AUDIT-v2)
+Track A: Mechanical fixes
+Track B: Structural fixes
+Track C: Domain fixes
+Track D: Final audit (AUDIT-v2)
 ```
 
-## 5-2. 실행 원칙
+## 5-2. Execution Principles
 
-- Critical → High → Medium → Low 순서
-- Track별로 독립 세션에서 진행
-- 각 Track 완료 후 빌드/테스트 통과 확인
-- Rule Guard 사전/사후 검증 수행
+- Order: Critical → High → Medium → Low
+- Run each Track in an independent session
+- Confirm build/tests pass after each Track completes
+- Perform Rule Guard pre/post verification
 
-## 5-3. 최종 감사
+## 5-3. Final Audit
 
-리팩토링 완료 후 AUDIT-v2를 실행해 준수율을 재측정한다. 목표는 `Critical 0, High 0` 이다.
+After refactoring is complete, run AUDIT-v2 to re-measure the compliance rate. The target is `Critical 0, High 0`.
 
 ---
 
-# Phase 6: Rule Guard 설정
+# Phase 6: Rule Guard Setup
 
-Codex에서는 Rule Guard를 custom agent로 정의한다.
+In Codex, Rule Guard is defined as a custom agent.
 
 ## `.codex/agents/rule-guard.toml`
 
 ```toml
 name = "rule-guard"
-description = "코드 수정 전과 후에 호출한다. rules/ 디렉터리의 규칙을 기준으로 수정 계획 또는 수정 결과가 MUST/MUST NOT 항목을 위반하지 않는지 검증한다."
+description = "Invoke before and after code changes. Verifies, against the rules in the rules/ directory, that a change plan or change result does not violate MUST/MUST NOT items."
 
 developer_instructions = """
 # Rule Guard
 
-코드 수정의 규칙 준수 여부를 검증하는 서브에이전트.
-코드를 수정하지 않는다. 읽기, 검색, 보고만 수행한다.
+A subagent that verifies whether code changes comply with the rules.
+It does not modify code. It only reads, searches, and reports.
 
-## 호출 시점
+## When to Invoke
 
-1. 사전 검토: 수정 계획 수립 후, 실행 전에 호출한다
-2. 사후 검증: 수정 완료 후, 실제 코드가 규칙을 준수하는지 호출한다
+1. Pre-review: invoke after the change plan is made, before execution
+2. Post-verification: invoke after the change is complete, to check that the actual code complies with the rules
 
-## 검증 절차
+## Verification Procedure
 
-### 사전 검토
-1. 수정 대상 파일 목록을 확인한다
-2. rules/INDEX.yaml에서 각 파일에 적용되는 규칙을 확인한다
-3. 해당 규칙 파일을 읽는다
-4. 수정 계획이 MUST / MUST NOT 항목을 위반하지 않는지 확인한다
-5. PASS 또는 ISSUE를 반환한다
+### Pre-review
+1. Check the list of files to be modified
+2. Check rules/INDEX.yaml for the rules that apply to each file
+3. Read those rule files
+4. Check that the change plan does not violate MUST / MUST NOT items
+5. Return PASS or ISSUE
 
-### 사후 검증
-1. 수정된 파일을 읽는다
-2. 규칙 기준으로 실제 코드를 검증한다
-3. grep 등으로 위반 패턴이 잔존하지 않는지 확인한다
-4. PASS 또는 ISSUE를 반환한다
+### Post-verification
+1. Read the modified files
+2. Verify the actual code against the rules
+3. Use grep etc. to confirm no violation patterns remain
+4. Return PASS or ISSUE
 
-## 원칙
-- MUST / MUST NOT 위반만 판정한다. PREFER는 판정하지 않는다.
-- 규칙 파일을 추론하지 않는다. 반드시 읽고 판정한다
-- 규칙 파일을 수정하지 않는다
-- 코드를 수정하지 않는다. 파일 쓰기를 수행하지 않는다.
-- Bash는 보고와 grep 검색에만 사용한다.
-- 규칙에 명시되지 않은 사항은 위반으로 판정하지 않는다
+## Principles
+- Judge only MUST / MUST NOT violations. Do not judge PREFER.
+- Do not infer rule files. Always read them before judging
+- Do not modify rule files
+- Do not modify code. Do not perform file writes.
+- Use Bash only for reporting and grep searches.
+- Do not judge anything not stated in the rules as a violation
 """
 ```
 
-## 선택적 보조 에이전트
+## Optional Auxiliary Agents
 
 ### `.codex/agents/auditor.toml`
 
 ```toml
 name = "auditor"
-description = "rules/ 기준으로 코드베이스를 배치 단위로 전수 감사한다."
+description = "Audits the entire codebase in batches against rules/."
 
 developer_instructions = """
-rules/와 INDEX.yaml을 읽고, 지정된 범위의 파일을 감사하라.
-코드를 수정하지 말고 위반 목록과 severity만 보고하라.
+Read rules/ and INDEX.yaml, and audit the files in the specified scope.
+Do not modify code; report only the violation list and severities.
 """
 ```
 
@@ -467,82 +469,82 @@ rules/와 INDEX.yaml을 읽고, 지정된 범위의 파일을 감사하라.
 
 ```toml
 name = "refactorer"
-description = "지정된 위반을 해소하도록 최소 범위로 코드를 수정한다."
+description = "Modifies code with minimal scope to resolve the specified violations."
 
 developer_instructions = """
-규칙을 먼저 읽고, 지정된 위반만 해소하라.
-변경 범위를 최소화하라.
-수정 전 사전 검토 결과를 확인하고, 수정 후 사후 검증이 가능하도록 변경 이유를 명확히 남겨라.
+Read the rules first, and resolve only the specified violations.
+Minimize the scope of changes.
+Check the pre-review result before modifying, and leave clear reasons for the changes so that post-verification is possible.
 """
 ```
 
 ---
 
-# Phase 7: AGENTS.md 설정
+# Phase 7: AGENTS.md Setup
 
-`AGENTS.md`는 Codex의 프로젝트 진입점이다.
+`AGENTS.md` is Codex's project entry point.
 
-## 루트 `AGENTS.md` 예시
+## Root `AGENTS.md` Example
 
 ```markdown
 # Project Agent Instructions
 
 ## Core Rule System
-- 이 프로젝트의 구현 규칙은 `rules/` 디렉터리에 정의되어 있다.
-- 작업 시작 시 `rules/INDEX.yaml`을 먼저 확인한다.
-- 현재 작업에 적용되는 규칙 파일을 읽고 진행한다.
-- MUST / MUST NOT 위반은 금지한다.
-- 규칙 파일을 추론하지 않는다. 반드시 읽고 판정한다.
-- 규칙 파일을 수정하지 않는다. 사용자가 명시적으로 요청한 경우만 예외다.
+- This project's implementation rules are defined in the `rules/` directory.
+- At the start of a task, check `rules/INDEX.yaml` first.
+- Read the rule files that apply to the current task before proceeding.
+- Violating MUST / MUST NOT is forbidden.
+- Do not infer rule files. Always read them before judging.
+- Do not modify rule files. The only exception is when the user explicitly requests it.
 
 ## Rule Guard Workflow
-- 코드 수정 전에는 `rule-guard`로 사전 검토를 수행한다.
-- 코드 수정 후에는 `rule-guard`로 사후 검증을 수행한다.
-- 사전 검토가 ISSUE이면 수정 계획부터 고친다.
-- 사후 검증이 ISSUE이면 작업 완료로 간주하지 않는다.
+- Before modifying code, perform a pre-review with `rule-guard`.
+- After modifying code, perform a post-verification with `rule-guard`.
+- If the pre-review returns ISSUE, fix the change plan first.
+- If the post-verification returns ISSUE, do not consider the task complete.
 
 ## Build and Test
-- task complete 보고 전에 관련 빌드/테스트를 통과해야 한다.
-- 테스트가 없으면 최소한 정적 분석 또는 관련 검증 명령을 수행한다.
+- Relevant builds/tests must pass before reporting task complete.
+- If there are no tests, at least run static analysis or relevant verification commands.
 
 ## Change Discipline
-- 수정 범위는 최소화한다.
-- 현재 작업과 무관한 리팩토링을 섞지 않는다.
-- 구조 변경은 변경 이유를 설명 가능해야 한다.
+- Minimize the scope of changes.
+- Do not mix in refactoring unrelated to the current task.
+- Structural changes must have an explainable reason.
 
 ## Baden Monitoring
-- 이 프로젝트는 Baden 모니터링 하에서 운영된다.
-- 사용자 지시를 받으면 작업 시작 전에 Baden에 시작 보고를 한다.
-- 접근 방식을 정하면 Baden에 계획 보고를 한다.
-- 코드 수정 시작 전, 검증 시작 전, 작업 종료 시 Baden에 보고한다.
-- 보고가 누락되면 즉시 보완하고 이후 단계를 진행한다.
+- This project operates under Baden monitoring.
+- When you receive a user instruction, send a start report to Baden before starting the task.
+- When you decide on an approach, send a plan report to Baden.
+- Report to Baden before starting code changes, before starting verification, and at the end of the task.
+- If a report is missed, fill it in immediately before proceeding to the next step.
 
 ## Operational Constraint
-- hooks가 있다고 가정하지 않는다.
-- 검증과 보고는 항상 명시적으로 수행한다.
+- Do not assume hooks exist.
+- Always perform verification and reporting explicitly.
 ```
 
 ---
 
-# Phase 8: Baden 연동
+# Phase 8: Baden Integration
 
-Codex에서는 Baden 연동을 다음 세 가지 방식 중 하나로 운영한다.
+In Codex, Baden integration runs in one of the following three ways.
 
-## 권장 우선순위
+## Recommended Priority
 
-1. **MCP 서버 방식**
-2. **프로젝트 스크립트 방식**
-3. **직접 HTTP 호출 방식**
+1. **MCP server approach**
+2. **Project script approach**
+3. **Direct HTTP call approach**
 
-자동 훅을 전제하지 않으므로, 보고는 명시적 워크플로우 단계로 수행한다.
+Since automatic hooks are not assumed, reporting is performed as explicit workflow steps.
 
-## 8-1. 프로젝트 등록
+## 8-1. Project Registration
 
-Baden 대시보드 또는 API로 프로젝트를 등록한다.
+Register the project via the Baden dashboard or API.
 
-## 8-2. 보고 이벤트 모델
+## 8-2. Reporting Event Model
 
-최소한 다음 이벤트를 사용한다.
+Use at least the following events.
 
 - `baden_start_task`
 - `baden_plan`
@@ -551,39 +553,39 @@ Baden 대시보드 또는 API로 프로젝트를 등록한다.
 - `baden_verify`
 - `baden_complete_task`
 
-## 8-3. 보고 시점
+## 8-3. When to Report
 
-### 사용자 지시 수신
-작업 시작 전에 `baden_start_task`. 반환된 taskId를 이후 같은 작업의 모든 보고에 사용한다.
+### On Receiving a User Instruction
+`baden_start_task` before starting the task. Use the returned taskId for all subsequent reports on the same task.
 
-### 계획 수립
-접근 방식을 정하면 `baden_plan`. 코드를 읽거나 수정하지 않더라도 계획 단계에서 호출한다.
+### On Planning
+`baden_plan` once the approach is decided. Call it at the planning stage even if no code is read or modified.
 
-### 행동 보고
-`baden_action`을 모든 행동 **실행 전에** 호출한다. 규칙 관련 행동에는 `baden_rule`, 검증 행동에는 `baden_verify`를 사용한다.
+### Action Reports
+Call `baden_action` **before executing** every action. Use `baden_rule` for rule-related actions and `baden_verify` for verification actions.
 
-### 완료 시
-작업 종료 후 `baden_complete_task`
+### On Completion
+`baden_complete_task` after the task ends
 
-## 8-4. 원칙
+## 8-4. Principles
 
-- **보고 없이 행동하지 않는다.** 모든 읽기, 검색, 테스트는 보고 후 수행한다.
-- **계획도 보고한다.** 도구 호출이 아닌 사고 과정도 보고 대상이다.
-- **행동을 자유롭게 기술한다.** snake_case 키워드를 직접 만들어 행동을 요약한다.
-- **이유를 구체적으로 쓴다.** 나중에 읽었을 때 맥락이 이해되는 수준으로 쓴다.
-- Codex 환경에서는 플랫폼 훅을 가정하지 않으므로, **단계 단위 보고를 강제 운영 규칙**으로 둔다.
-- 최소한 **시작 / 계획 / 수정 시작 / 검증 / 완료** 다섯 단계는 필수 보고로 운영한다.
-- 세부 행동 보고가 필요하면 wrapper script 또는 MCP 도구에서 일괄 처리한다.
+- **Do not act without reporting.** Every read, search, and test is performed after reporting.
+- **Report plans too.** Thought processes, not just tool calls, are subject to reporting.
+- **Describe actions freely.** Create your own snake_case keywords to summarize actions.
+- **Write specific reasons.** Write them so the context is understandable when read later.
+- Since platform hooks are not assumed in the Codex environment, **step-level reporting is kept as a mandatory operating rule**.
+- At minimum, the five steps **start / plan / change start / verification / completion** are operated as mandatory reports.
+- If detailed action reports are needed, handle them in bulk in a wrapper script or MCP tool.
 
-## 8-5. INDEX.yaml 연동
+## 8-5. INDEX.yaml Integration
 
-Baden은 프로젝트의 `rules/INDEX.yaml`을 파싱해 규칙 메타데이터를 등록한다. 규칙별 참조/위반/수정 빈도가 대시보드에서 추적된다.
+Baden parses the project's `rules/INDEX.yaml` and registers rule metadata. Reference/violation/fix frequency per rule is tracked on the dashboard.
 
 ---
 
-# Phase 9: Baden 스크립트 방식
+# Phase 9: Baden Script Approach
 
-MCP 대신 스크립트로 보고할 수 있다.
+You can report via a script instead of MCP.
 
 ## `scripts/baden-report.sh`
 
@@ -611,46 +613,46 @@ curl -s -X POST http://localhost:3800/api/events \
     '{projectName:$projectName, action:$action, reason:$reason, taskId:$taskId}')"
 ```
 
-## 사용 예시
+## Usage Examples
 
 ```bash
-scripts/baden-report.sh baden_start_task "사용자 요청 수신: 규칙 시스템 초기화"
-scripts/baden-report.sh baden_plan "rules 구조를 먼저 분석하고 INDEX.yaml 초안을 작성"
-scripts/baden-report.sh baden_action "C2 위반 해소를 위해 서비스 레이어 분리 시작" "task-123"
-scripts/baden-report.sh baden_verify "리팩토링 후 테스트와 rule-guard 검증 수행" "task-123"
-scripts/baden-report.sh baden_complete_task "Track B 완료" "task-123"
+scripts/baden-report.sh baden_start_task "Received user request: initialize the rule system"
+scripts/baden-report.sh baden_plan "Analyze the rules structure first and draft INDEX.yaml"
+scripts/baden-report.sh baden_action "Start separating the service layer to resolve the C2 violation" "task-123"
+scripts/baden-report.sh baden_verify "Run tests and rule-guard verification after refactoring" "task-123"
+scripts/baden-report.sh baden_complete_task "Track B complete" "task-123"
 ```
 
 ---
 
-# Phase 10: Skills 설정
+# Phase 10: Skills Setup
 
-반복 절차는 Codex skill로 패키징할 수 있다.
+Repeated procedures can be packaged as Codex skills.
 
 ## `.codex/skills/rules-audit/SKILL.md`
 
 ```markdown
 ---
 name: rules-audit
-description: rules/INDEX.yaml과 규칙 파일을 기준으로 코드베이스를 감사하는 절차
+description: Procedure for auditing the codebase against rules/INDEX.yaml and the rule files
 ---
 
 # Rules Audit Skill
 
-## 목적
-규칙 파일과 코드베이스를 대조해 MUST / MUST NOT 위반을 찾는다.
+## Purpose
+Compare the rule files against the codebase to find MUST / MUST NOT violations.
 
-## 절차
-1. rules/INDEX.yaml을 읽는다
-2. 적용 대상 규칙 파일을 읽는다
-3. 지정 범위의 코드를 검색한다
-4. 위반을 severity와 함께 정리한다
-5. 결과를 `rules/_audit-*.md` 형식으로 제안한다
+## Procedure
+1. Read rules/INDEX.yaml
+2. Read the applicable rule files
+3. Search the code in the specified scope
+4. Organize violations along with their severity
+5. Propose the results in the `rules/_audit-*.md` format
 
-## 제약
-- 코드를 수정하지 않는다
-- PREFER는 위반으로 판정하지 않는다
-- 규칙 파일을 추론하지 않는다
+## Constraints
+- Do not modify code
+- Do not judge PREFER as a violation
+- Do not infer rule files
 ```
 
 ## `.codex/skills/baden-report/SKILL.md`
@@ -658,32 +660,32 @@ description: rules/INDEX.yaml과 규칙 파일을 기준으로 코드베이스�
 ```markdown
 ---
 name: baden-report
-description: Baden 보고 절차를 일관되게 수행하는 운영 스킬
+description: Operational skill for performing Baden reporting consistently
 ---
 
 # Baden Report Skill
 
-## 목적
-작업의 주요 단계에서 Baden 보고를 누락하지 않도록 한다.
+## Purpose
+Ensure Baden reports are not missed at the major steps of a task.
 
-## 필수 단계
+## Required Steps
 1. start_task
 2. plan
 3. action
 4. verify
 5. complete_task
 
-## 원칙
-- hooks를 가정하지 않는다
-- 명시적으로 보고한다
-- taskId를 일관되게 재사용한다
+## Principles
+- Do not assume hooks
+- Report explicitly
+- Reuse the taskId consistently
 ```
 
 ---
 
-# Phase 11: Codex 설정
+# Phase 11: Codex Configuration
 
-## `.codex/config.toml` 예시
+## `.codex/config.toml` Example
 
 ```toml
 model = "gpt-5-codex"
@@ -709,138 +711,138 @@ approval_policy = "never"
 sandbox_mode = "danger-full-access"
 ```
 
-## 운영 가이드
+## Operating Guide
 
-- 기본값은 `workspace-write` 또는 그에 준하는 최소 권한으로 운영한다.
-- 감사와 규칙 검증은 가능한 한 읽기 전용 프로필을 사용한다.
-- 네트워크가 꼭 필요하지 않으면 끈다.
-- Baden이 MCP 또는 HTTP를 통해 필요하면 최소 범위로만 허용한다.
-- 완전 무제한 모드는 외부에서 충분히 격리된 환경에서만 사용한다.
-
----
-
-# Phase 12: 표준 실행 시나리오
-
-## 시나리오 A — 새 기능 구현
-
-1. Baden 시작 보고
-2. `rules/INDEX.yaml` 확인
-3. 적용 규칙 파일 읽기
-4. `rule-guard` 사전 검토
-5. 구현
-6. Baden 검증 보고
-7. 테스트 / 정적 분석
-8. `rule-guard` 사후 검증
-9. Baden 완료 보고
-
-## 시나리오 B — 감사 실행
-
-1. Baden 시작 보고
-2. 감사 범위 정의
-3. `auditor` 실행
-4. 위반 목록 작성
-5. Baden 완료 보고
-
-## 시나리오 C — 리팩토링 Track 수행
-
-1. Baden 시작 보고
-2. 대상 위반 선정
-3. `rule-guard` 사전 검토
-4. `refactorer` 수정
-5. 테스트 / 검증
-6. `rule-guard` 사후 검증
-7. Baden 완료 보고
+- Use `workspace-write` or an equivalent least-privilege setting as the default.
+- Use a read-only profile for audits and rule verification whenever possible.
+- Turn off network access unless it is truly needed.
+- If Baden is needed via MCP or HTTP, allow only the minimum scope.
+- Use the fully unrestricted mode only in environments that are sufficiently isolated from the outside.
 
 ---
 
-# 체크리스트
+# Phase 12: Standard Execution Scenarios
+
+## Scenario A — Implementing a New Feature
+
+1. Baden start report
+2. Check `rules/INDEX.yaml`
+3. Read the applicable rule files
+4. `rule-guard` pre-review
+5. Implement
+6. Baden verification report
+7. Tests / static analysis
+8. `rule-guard` post-verification
+9. Baden completion report
+
+## Scenario B — Running an Audit
+
+1. Baden start report
+2. Define the audit scope
+3. Run `auditor`
+4. Compile the violation list
+5. Baden completion report
+
+## Scenario C — Running a Refactoring Track
+
+1. Baden start report
+2. Select target violations
+3. `rule-guard` pre-review
+4. `refactorer` changes
+5. Tests / verification
+6. `rule-guard` post-verification
+7. Baden completion report
+
+---
+
+# Checklist
 
 ```text
-Phase 1: 프로젝트 분석
-  [ ] 구조 파악 완료
-  [ ] 패턴 탐색 완료
-  [ ] 정적 분석 현황 확인
-  [ ] _analysis.md 작성
+Phase 1: Project Analysis
+  [ ] Structure understood
+  [ ] Pattern exploration done
+  [ ] Static analysis setup checked
+  [ ] _analysis.md written
 
-Phase 2: 규칙 체계 설계
-  [ ] rules/ 디렉터리 생성
-  [ ] INDEX.yaml 초안 작성
-  [ ] Tier 구조 결정
+Phase 2: Rule System Design
+  [ ] rules/ directory created
+  [ ] INDEX.yaml draft written
+  [ ] Tier structure decided
 
-Phase 3: 규칙 작성
-  [ ] principles.md (6개 이하)
-  [ ] Concerns C1~Cn (9개 이하 권장)
-  [ ] Specifics S-* (핵심 도메인만)
-  [ ] INDEX.yaml 트리거 매핑 완료
+Phase 3: Writing Rules
+  [ ] principles.md (6 or fewer)
+  [ ] Concerns C1~Cn (9 or fewer recommended)
+  [ ] Specifics S-* (core domains only)
+  [ ] INDEX.yaml trigger mapping done
 
-Phase 4: 초기 감사
-  [ ] AUDIT-v1 실행
-  [ ] 위반 목록 정리
-  [ ] 예외 판정 완료
-  [ ] 준수율 산출
+Phase 4: Initial Audit
+  [ ] AUDIT-v1 run
+  [ ] Violation list organized
+  [ ] Exception decisions done
+  [ ] Compliance rate calculated
 
-Phase 5: 리팩토링
-  [ ] Track 분할
-  [ ] Critical / High 해소
-  [ ] AUDIT-v2 실행
-  [ ] Critical 0, High 0 달성
+Phase 5: Refactoring
+  [ ] Tracks split
+  [ ] Critical / High resolved
+  [ ] AUDIT-v2 run
+  [ ] Critical 0, High 0 achieved
 
 Phase 6: Rule Guard
-  [ ] .codex/agents/rule-guard.toml 생성
-  [ ] AGENTS.md에 Rule Guard 지침 추가
+  [ ] .codex/agents/rule-guard.toml created
+  [ ] Rule Guard instructions added to AGENTS.md
 
-Phase 7: Baden 연동
-  [ ] 프로젝트 등록
-  [ ] AGENTS.md에 Baden 보고 지침 추가
-  [ ] MCP 또는 스크립트 보고 설정
-  [ ] INDEX.yaml 연동 확인
+Phase 7: Baden Integration
+  [ ] Project registered
+  [ ] Baden reporting instructions added to AGENTS.md
+  [ ] MCP or script reporting set up
+  [ ] INDEX.yaml integration confirmed
 
 Phase 8: Skills
-  [ ] rules-audit skill 작성
-  [ ] baden-report skill 작성
+  [ ] rules-audit skill written
+  [ ] baden-report skill written
 
-Phase 9: Codex 설정
-  [ ] .codex/config.toml 작성
-  [ ] 프로필 분리
-  [ ] sandbox / approval 정책 검토
+Phase 9: Codex Configuration
+  [ ] .codex/config.toml written
+  [ ] Profiles separated
+  [ ] sandbox / approval policies reviewed
 ```
 
 ---
 
-# 참고: 프로젝트 성숙도별 접근
+# Reference: Approach by Project Maturity
 
-## 새 프로젝트 (코드 없음)
+## New Project (No Code)
 
-- Phase 1 생략 가능
-- Phase 2부터 시작
-- 코드를 쓰기 전에 principles.md와 핵심 Concerns만 먼저 작성
-- 코드가 쌓이면서 Specifics를 점진적으로 추가
-- 초기에는 감사/리팩토링 불필요
+- Phase 1 can be skipped
+- Start from Phase 2
+- Before writing code, write only principles.md and the core Concerns first
+- Add Specifics incrementally as code accumulates
+- No audit/refactoring needed initially
 
-## 초기 프로젝트 (~10K lines)
+## Early Project (~10K lines)
 
-- Phase 1을 빠르게 수행
-- 주요 패턴만 규칙화
-- Concerns 3~5개, Specifics 2~3개
-- 가벼운 감사 후 즉시 정상 운영
+- Run Phase 1 quickly
+- Turn only the major patterns into rules
+- 3–5 Concerns, 2–3 Specifics
+- Normal operation right after a light audit
 
-## 성장한 프로젝트 (~50K+ lines)
+## Mature Project (~50K+ lines)
 
-- Phase 1을 철저히 수행
-- 전체 Tier 구조 적용
-- 전수 감사 + 체계적 리팩토링 필수
-- Baden 연동 권장
-- 가능하면 감사 전용 프로필과 구현 전용 프로필을 분리 운영
+- Run Phase 1 thoroughly
+- Apply the full Tier structure
+- Full audit + systematic refactoring required
+- Baden integration recommended
+- If possible, operate separate audit-only and implementation-only profiles
 
 ---
 
-# 최종 운영 원칙 요약
+# Summary of Final Operating Principles
 
-- `AGENTS.md`는 프로젝트의 Codex 진입 규칙이다.
-- `rules/`는 실제 구현 규칙의 소스 오브 트루스다.
-- `rule-guard`는 항상 수정 전후에 호출한다.
-- hooks를 전제하지 않는다.
-- Baden 보고는 명시적으로 수행한다.
-- approvals / sandbox는 최소 권한 원칙으로 운영한다.
-- 반복 절차는 skills로 패키징한다.
-- 감사와 구현 역할은 분리한다.
+- `AGENTS.md` is the project's Codex entry rule set.
+- `rules/` is the source of truth for the actual implementation rules.
+- Always invoke `rule-guard` before and after changes.
+- Do not assume hooks.
+- Perform Baden reporting explicitly.
+- Operate approvals / sandbox on the principle of least privilege.
+- Package repeated procedures as skills.
+- Separate audit and implementation roles.

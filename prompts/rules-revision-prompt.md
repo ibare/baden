@@ -1,456 +1,458 @@
+**English** | [한국어](./rules-revision-prompt.ko.md)
+
 # Rules Revision — Industry Top-Tier Baseline
 
-기존 규칙 시스템을 점검하고 개정한다. 판단 기준은 서비스 프로파일에 따른 등급(S/A/B/C/D)으로 결정되며, 보안과 개인정보 취급은 일반 기준보다 한 단계 이상 엄격한 기준을 적용한다.
+Audit and revise the existing rule system. The judgment baseline is determined by a grade (S/A/B/C/D) derived from the service profile, and security and personal data handling are held to a standard at least one level stricter than the general baseline.
 
 ---
 
-## 원칙
+## Principles
 
-- 규칙 파일을 전부 읽는다. 추론하지 않는다.
-- 코드를 직접 읽고 규칙과 대조한다. 규칙이 있으니 코드가 좋을 것이라 가정하지 않는다.
-- 업계 기준은 구체적으로 명시한다. "일반적으로 좋은 관행" 수준의 모호한 기준은 사용하지 않는다.
-- 규칙 변경 제안에는 반드시 코드 근거(파일, 줄, 패턴)를 첨부한다.
+- Read every rule file. Do not infer.
+- Read the code directly and compare it against the rules. Do not assume the code is good just because rules exist.
+- State industry baselines concretely. Do not use vague standards on the level of "generally good practice."
+- Every rule change proposal MUST include code evidence (file, line, pattern).
 
 ---
 
-## Step 0: 서비스 분류 및 기준선 수립
+## Step 0: Service Classification and Baseline Setting
 
-프로젝트의 서비스 특성을 파악하고, 그에 맞는 기준 수준을 결정한다. 기준은 서비스 규모와 성격에 따라 달라진다.
+Identify the service characteristics of the project and determine the appropriate baseline level. The baseline varies with the scale and nature of the service.
 
-### 0-1. 서비스 프로파일 작성
+### 0-1. Write the Service Profile
 
-아래 항목을 코드와 설정에서 파악한다. **추정으로 채우지 않는다. 판단이 불확실한 항목은 사용자에게 질의한다.**
+Determine the items below from the code and configuration. **Do not fill them in by guessing. Ask the user about any item you cannot determine with confidence.**
 
 ```
-## 서비스 프로파일
+## Service Profile
 
-### 제품 분야
-- 분야: (예: B2B SaaS, 에드테크, 핀테크, 헬스케어, 이커머스, 소셜, 게임 등)
-- 제품 유형: (예: 웹 앱, 모바일 앱, API 서비스, 데이터 파이프라인, 임베디드 등)
+### Product Domain
+- Domain: (e.g., B2B SaaS, EdTech, FinTech, Healthcare, E-commerce, Social, Gaming, etc.)
+- Product type: (e.g., web app, mobile app, API service, data pipeline, embedded, etc.)
 
-### 서비스 규모
-- 대상 사용자 범위: (예: 사내 도구, 특정 그룹, 단일 국가, 다국가, 글로벌)
-- 예상/실제 사용자 수: (예: <1K, 1K~10K, 10K~100K, 100K~1M, 1M+)
-- 트래픽 수준: (예: 낮음, 중간, 높음, 매우 높음)
-- 서비스 단계: (예: MVP/프로토타입, 초기 운영, 성장기, 대규모 운영)
+### Service Scale
+- Target user scope: (e.g., internal tool, specific group, single country, multi-country, global)
+- Expected/actual number of users: (e.g., <1K, 1K~10K, 10K~100K, 100K~1M, 1M+)
+- Traffic level: (e.g., low, medium, high, very high)
+- Service stage: (e.g., MVP/prototype, early operation, growth, large-scale operation)
 
-### 데이터 특성
-- 취급 데이터: (예: 일반, 개인정보, 결제정보, 건강정보, 아동 데이터)
-- 데이터 소재지 요구: (예: 없음, 단일 국가, EU, 다중 리전)
-- 데이터 볼륨: (예: GB 이하, TB급, PB급)
+### Data Characteristics
+- Data handled: (e.g., general, personal data, payment data, health data, children's data)
+- Data residency requirements: (e.g., none, single country, EU, multi-region)
+- Data volume: (e.g., GB or less, TB scale, PB scale)
 
-### 규제 환경
-- 적용 규제: (예: 없음, 개인정보보호법, GDPR, HIPAA, PCI-DSS, SOC2, COPPA 등)
-- 인증/컴플라이언스: (예: 없음, ISO 27001, SOC2 Type II 등)
-- 감사 요구: (예: 없음, 내부 감사, 외부 감사, 정기 규제 감사)
+### Regulatory Environment
+- Applicable regulations: (e.g., none, PIPA (Korea's Personal Information Protection Act), GDPR, HIPAA, PCI-DSS, SOC2, COPPA, etc.)
+- Certifications/compliance: (e.g., none, ISO 27001, SOC2 Type II, etc.)
+- Audit requirements: (e.g., none, internal audit, external audit, periodic regulatory audit)
 ```
 
-**사용자에게 확인해야 하는 항목:**
-- 대상 사용자 범위와 예상 사용자 수가 코드에서 파악되지 않으면 반드시 질의한다.
-- 적용 규제가 불분명하면 반드시 질의한다. 규제를 추정하지 않는다.
-- 서비스 단계(MVP vs 운영 중)에 따라 기준이 크게 달라지므로 반드시 확인한다.
+**Items you must confirm with the user:**
+- If the target user scope and expected number of users cannot be determined from the code, you MUST ask.
+- If the applicable regulations are unclear, you MUST ask. Do not guess regulations.
+- The baseline changes significantly depending on the service stage (MVP vs. in operation), so you MUST confirm it.
 
-### 0-2. 서비스 등급 결정
+### 0-2. Determine the Service Grade
 
-프로파일 결과를 아래 등급 표에 매핑한다:
+Map the profile results onto the grade table below:
 
-| 등급 | 서비스 특성 | 일반 기준 | 보안/개인정보 기준 |
+| Grade | Service Characteristics | General Baseline | Security/Privacy Baseline |
 |:----:|-----------|:--------:|:--------------:|
-| **S** | 글로벌 서비스, 1M+ 사용자, 결제/건강/금융 데이터, 규제 감사 대상 | 상위 1% | 상위 0.5% |
-| **A** | 다국가 또는 단일 국가 대규모, 100K+ 사용자, 개인정보 포함, GDPR/개인정보보호법 적용 | 상위 3% | 상위 1% |
-| **B** | 단일 국가, 특정 사용자 그룹 대상, 10K+ 사용자, 개인정보 포함 | 상위 5% | 상위 3% |
-| **C** | 사내 도구 또는 소규모 서비스, <10K 사용자, 일반 데이터 위주 | 상위 10% | 상위 5% |
-| **D** | MVP/프로토타입, 검증 단계, 운영 전 | 상위 20% | 상위 10% |
+| **S** | Global service, 1M+ users, payment/health/financial data, subject to regulatory audit | Top 1% | Top 0.5% |
+| **A** | Multi-country or large-scale single country, 100K+ users, includes personal data, GDPR/PIPA applies | Top 3% | Top 1% |
+| **B** | Single country, targets a specific user group, 10K+ users, includes personal data | Top 5% | Top 3% |
+| **C** | Internal tool or small-scale service, <10K users, mostly general data | Top 10% | Top 5% |
+| **D** | MVP/prototype, validation stage, pre-launch | Top 20% | Top 10% |
 
-**등급 상향 조건** (하나라도 해당되면 한 단계 올린다):
-- 아동 데이터를 취급한다 (COPPA 등)
-- 결제 정보를 직접 처리한다 (PCI-DSS)
-- 건강/의료 정보를 취급한다 (HIPAA)
-- 정부/공공기관 대상 서비스이다
-- 서비스 중단이 물리적 안전에 영향을 미친다
+**Grade escalation conditions** (if any one applies, raise the grade by one level):
+- Handles children's data (COPPA, etc.)
+- Processes payment information directly (PCI-DSS)
+- Handles health/medical information (HIPAA)
+- Serves government/public institutions
+- A service outage affects physical safety
 
-**등급 결정 결과를 사용자에게 보고하고 확인받는다.** 사용자가 등급을 조정하면 따른다.
+**Report the grade decision to the user and get confirmation.** If the user adjusts the grade, follow it.
 
-### 0-3. 등급별 기준 정의
+### 0-3. Define Baselines per Grade
 
-결정된 등급에 맞춰 각 영역의 구체적 기준을 정의한다. 프로젝트의 기술 스택과 분야를 고려해 작성한다.
+Define concrete baselines for each area according to the determined grade. Take the project's tech stack and domain into account.
 
-#### 아키텍처
+#### Architecture
 
-| 등급 S/A | 등급 B | 등급 C/D |
+| Grade S/A | Grade B | Grade C/D |
 |---------|-------|---------|
-| 명확한 레이어 분리 + 도메인 경계 강제 | 레이어 분리 + 도메인 디렉터리 분리 | 기본적 관심사 분리 |
-| API 버전 관리 필수 | API 버전 관리 권장 | 불필요 |
-| 서비스 간 계약 테스트 | 통합 테스트 | 기본 테스트 |
-| 분산 추적 + 구조화 로깅 | 구조화 로깅 | 기본 로깅 |
+| Clear layer separation + enforced domain boundaries | Layer separation + domain directory separation | Basic separation of concerns |
+| API versioning required | API versioning recommended | Not required |
+| Contract tests between services | Integration tests | Basic tests |
+| Distributed tracing + structured logging | Structured logging | Basic logging |
 
-#### 코드 품질
+#### Code Quality
 
-| 등급 S/A | 등급 B | 등급 C/D |
+| Grade S/A | Grade B | Grade C/D |
 |---------|-------|---------|
-| 테스트 커버리지 80%+ | 핵심 로직 테스트 필수 | 주요 기능 테스트 |
-| 순환 의존 제로 | 순환 의존 최소화 | 명백한 순환 금지 |
-| 정적 분석 CI 필수 + 경고 제로 | 정적 분석 CI 필수 | 정적 분석 설정 |
-| 타입 안전성 100% | 타입 안전성 95%+ | 핵심 인터페이스 타입 정의 |
+| Test coverage 80%+ | Tests required for core logic | Tests for major features |
+| Zero circular dependencies | Minimize circular dependencies | No obvious circular dependencies |
+| Static analysis in CI required + zero warnings | Static analysis in CI required | Static analysis configured |
+| 100% type safety | 95%+ type safety | Type definitions for core interfaces |
 
-#### 에러 처리
+#### Error Handling
 
-| 등급 S/A | 등급 B | 등급 C/D |
+| Grade S/A | Grade B | Grade C/D |
 |---------|-------|---------|
-| 구조화 에러 계층 + 도메인별 분류 | 커스텀 에러 클래스 + 일관된 형식 | 에러 전파 + 기본 분류 |
-| 재시도/서킷브레이커 필수 | 외부 호출 재시도 권장 | 기본 타임아웃 |
-| 에러 리포팅 시스템 연동 | 에러 로깅 체계화 | 에러 로깅 |
+| Structured error hierarchy + per-domain classification | Custom error classes + consistent format | Error propagation + basic classification |
+| Retry/circuit breaker required | Retry recommended for external calls | Basic timeouts |
+| Integrated with an error reporting system | Systematized error logging | Error logging |
 
-#### 보안 (등급별 차등)
+#### Security (differentiated by grade)
 
-| 등급 S | 등급 A | 등급 B | 등급 C/D |
+| Grade S | Grade A | Grade B | Grade C/D |
 |-------|-------|-------|---------|
-| PII 암호화 at rest + in transit + 필드 레벨 | PII 암호화 at rest + in transit | PII 암호화 in transit + 민감 필드 해싱 | 기본 HTTPS |
-| 감사 로그 전량 + 변조 방지 | 감사 로그 전량 | 민감 작업 로깅 | 에러 로깅 |
-| 자동 시크릿 로테이션 | 시크릿 매니저 사용 | 환경변수 분리 | .env 분리 |
-| 의존성 자동 스캔 + SBOM | 의존성 자동 스캔 | 수동 점검 | 알려진 취약점 확인 |
-| 침투 테스트 정기 실시 | 보안 코드 리뷰 | 기본 입력 검증 | 기본 입력 검증 |
-| 데이터 보존/삭제 정책 코드 강제 | soft delete + 유예 정책 | soft delete | 삭제 방식 일관성 |
+| PII encryption at rest + in transit + field level | PII encryption at rest + in transit | PII encryption in transit + hashing of sensitive fields | Basic HTTPS |
+| Full audit logs + tamper protection | Full audit logs | Logging of sensitive operations | Error logging |
+| Automatic secret rotation | Use of a secret manager | Separate environment variables | Separate .env |
+| Automated dependency scanning + SBOM | Automated dependency scanning | Manual review | Check for known vulnerabilities |
+| Regular penetration testing | Security code review | Basic input validation | Basic input validation |
+| Data retention/deletion policy enforced in code | Soft delete + grace period policy | Soft delete | Consistent deletion method |
 
-#### 개인정보 (등급별 차등)
+#### Personal Data (differentiated by grade)
 
-| 등급 S | 등급 A | 등급 B | 등급 C/D |
+| Grade S | Grade A | Grade B | Grade C/D |
 |-------|-------|-------|---------|
-| Privacy by Design 전면 적용 | 개인정보 처리 목록 관리 | 개인정보 식별 | 기본 인식 |
-| 데이터 최소화 원칙 코드 강제 | 불필요 데이터 수집 금지 규칙 | 수집 목적 명시 | - |
-| 동의 철회 시 자동 삭제 파이프라인 | 삭제 요청 처리 프로세스 | 삭제 API | - |
-| 다중 리전 데이터 소재지 강제 | 데이터 소재지 설정 | - | - |
-| DPO 지정 + DPIA 수행 | 개인정보 영향평가 | - | - |
+| Full application of Privacy by Design | Maintain an inventory of personal data processing | Identify personal data | Basic awareness |
+| Data minimization principle enforced in code | Rule prohibiting collection of unnecessary data | State the purpose of collection | - |
+| Automatic deletion pipeline on consent withdrawal | Deletion request handling process | Deletion API | - |
+| Enforced multi-region data residency | Data residency configuration | - | - |
+| Appoint a DPO + conduct a DPIA | Privacy impact assessment | - | - |
 
 ---
 
-## Step 1: 기존 규칙 전수 읽기
+## Step 1: Read All Existing Rules
 
-### 1-1. 규칙 파일 전량 읽기
+### 1-1. Read Every Rule File
 
 ```bash
-# 규칙 구조 파악
+# Understand the rule structure
 find rules/ -type f -name "*.md" | sort
 
-# INDEX.yaml 읽기
+# Read INDEX.yaml
 cat rules/INDEX.yaml
 
-# 모든 규칙 파일 읽기 (하나씩)
+# Read all rule files (one at a time)
 cat rules/principles.md
 cat rules/concerns/*.md
 cat rules/specifics/*.md
 ```
 
-### 1-2. 규칙 인벤토리 작성
+### 1-2. Write the Rule Inventory
 
 ```markdown
-## 규칙 인벤토리
+## Rule Inventory
 
-| ID | Tier | 이름 | MUST 수 | MUST NOT 수 | PREFER 수 | last_verified |
+| ID | Tier | Name | MUST count | MUST NOT count | PREFER count | last_verified |
 |----|------|------|:-------:|:-----------:|:---------:|:-------------:|
-| principles | T1 | 핵심 원칙 | X | X | X | 날짜 |
-| C1 | T2 | ... | X | X | X | 날짜 |
-| S-xxx | T3 | ... | X | X | X | 날짜 |
+| principles | T1 | Core principles | X | X | X | date |
+| C1 | T2 | ... | X | X | X | date |
+| S-xxx | T3 | ... | X | X | X | date |
 
-총 규칙 파일: X개
-총 MUST 항목: X개
-총 MUST NOT 항목: X개
+Total rule files: X
+Total MUST items: X
+Total MUST NOT items: X
 ```
 
 ---
 
-## Step 2: 규칙 커버리지 분석
+## Step 2: Rule Coverage Analysis
 
-### 2-1. 트리거 매칭 커버리지
+### 2-1. Trigger Match Coverage
 
-INDEX.yaml의 트리거가 실제 코드베이스를 얼마나 커버하는지 측정한다.
+Measure how much of the actual codebase the triggers in INDEX.yaml cover.
 
 ```bash
-# 전체 소스 파일 수
+# Total number of source files
 TOTAL=$(find . -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.py" -o -name "*.go" \) -not -path '*/node_modules/*' -not -path '*/dist/*' | wc -l)
 
-# INDEX.yaml의 각 paths 트리거별 매칭 파일 수
-# (각 트리거를 glob으로 실행해서 카운트)
+# Number of matching files per paths trigger in INDEX.yaml
+# (run each trigger as a glob and count)
 
-# 어떤 트리거에도 매칭되지 않는 파일 목록
-# (전체 파일 - 모든 트리거 매칭 합집합)
+# List of files that match no trigger at all
+# (all files - union of all trigger matches)
 ```
 
 ```markdown
-## 트리거 커버리지
+## Trigger Coverage
 
-- 전체 소스 파일: X개
-- 트리거 매칭 파일: X개 (X%)
-- **미커버 파일: X개 (X%)**
+- Total source files: X
+- Trigger-matched files: X (X%)
+- **Uncovered files: X (X%)**
 
-### 미커버 파일 목록
-| 파일 | 디렉터리 | 추정 도메인 |
+### Uncovered File List
+| File | Directory | Presumed Domain |
 |------|---------|-----------|
 | ... | ... | ... |
 ```
 
-### 2-2. 규칙 내용 커버리지
+### 2-2. Rule Content Coverage
 
-Step 0에서 결정된 등급 기준 대비 현재 규칙이 커버하지 않는 영역을 식별한다.
+Identify areas that the current rules do not cover relative to the grade baseline determined in Step 0.
 
 ```markdown
-## 기준 대비 미커버 영역
+## Uncovered Areas vs. Baseline
 
-### 일반 기준 미충족 (등급 X 기준)
-| # | 영역 | 등급 기준 | 현재 규칙 | 갭 |
+### General Baseline Not Met (Grade X baseline)
+| # | Area | Grade Baseline | Current Rule | Gap |
 |---|------|---------|---------|-----|
-| 1 | (예: 분산 추적) | (해당 등급 기준) | 없음 | 규칙 자체가 없음 |
-| 2 | (예: API 버전 관리) | (해당 등급 기준) | C3에 부분 언급 | MUST 항목 부재 |
+| 1 | (e.g., distributed tracing) | (baseline for the grade) | None | No rule exists at all |
+| 2 | (e.g., API versioning) | (baseline for the grade) | Partially mentioned in C3 | No MUST item |
 
-### 보안/개인정보 기준 미충족 (등급 X 보안 기준)
-| # | 영역 | 등급 기준 | 현재 규칙 | 갭 | Severity |
+### Security/Privacy Baseline Not Met (Grade X security baseline)
+| # | Area | Grade Baseline | Current Rule | Gap | Severity |
 |---|------|---------|---------|-----|:--------:|
-| 1 | (예: PII 암호화) | (해당 등급 보안 기준) | 없음 | Critical |
-| 2 | (예: 감사 로그) | (해당 등급 보안 기준) | 부분 | High |
+| 1 | (e.g., PII encryption) | (security baseline for the grade) | None | Critical |
+| 2 | (e.g., audit logs) | (security baseline for the grade) | Partial | High |
 ```
 
 ---
 
-## Step 3: 기존 규칙 vs 실제 코드 점검
+## Step 3: Existing Rules vs. Actual Code
 
-각 규칙의 MUST/MUST NOT을 실제 코드와 대조한다. 두 가지를 동시에 확인한다:
-- 규칙이 지켜지고 있는가? (위반 탐색)
-- 규칙이 현재 코드에 여전히 적합한가? (규칙 자체의 유효성)
+Compare each rule's MUST/MUST NOT items against the actual code. Check two things at the same time:
+- Is the rule being followed? (search for violations)
+- Is the rule still appropriate for the current code? (validity of the rule itself)
 
-### 3-1. 규칙별 코드 대조
+### 3-1. Compare Code per Rule
 
-각 규칙에 대해:
+For each rule:
 
-1. 규칙 파일을 읽는다
-2. MUST/MUST NOT 각 항목에 대해 grep/검색으로 준수/위반 패턴을 탐색한다
-3. 아래 중 하나로 판정한다:
+1. Read the rule file
+2. For each MUST/MUST NOT item, search for compliance/violation patterns with grep/search
+3. Assign one of the following verdicts:
 
-| 판정 | 의미 |
+| Verdict | Meaning |
 |------|------|
-| **EFFECTIVE** | 규칙이 지켜지고 있고, 여전히 유효하다 |
-| **VIOLATED** | 규칙이 존재하지만 위반이 있다 |
-| **STALE** | 코드가 이미 규칙을 넘어서 진화했다 (규칙이 낡음) |
-| **OBSOLETE** | 규칙이 더 이상 적용 대상이 없다 (기술/구조 변경) |
-| **WEAK** | 규칙이 있지만 해당 등급 기준에 미달한다 |
-| **CONFLICTING** | 다른 규칙과 충돌한다 |
+| **EFFECTIVE** | The rule is being followed and is still valid |
+| **VIOLATED** | The rule exists but there are violations |
+| **STALE** | The code has already evolved beyond the rule (the rule is outdated) |
+| **OBSOLETE** | The rule no longer has anything to apply to (technology/structure changed) |
+| **WEAK** | The rule exists but falls short of the grade baseline |
+| **CONFLICTING** | Conflicts with another rule |
 
 ```markdown
-## 규칙별 점검 결과
+## Per-Rule Audit Results
 
-| ID | 항목 | 판정 | 근거 (파일:줄) | 비고 |
+| ID | Item | Verdict | Evidence (file:line) | Notes |
 |----|------|:----:|--------------|------|
-| C1 | MUST: named export | EFFECTIVE | 전수 확인 312개 파일 | |
-| C1 | MUST NOT: export default | VIOLATED | src/pages/Home.tsx:1 | React.lazy 예외 아닌데 위반 |
-| C3 | MUST: 에러 재전파 | WEAK | 재전파는 하지만 에러 타입 미분류 | 등급 기준 미달 |
-| S-xxx | MUST: ... | STALE | 해당 모듈이 v2로 리팩토링됨 | 규칙 갱신 필요 |
-| S-yyy | 전체 | OBSOLETE | 해당 라이브러리 제거됨 | 규칙 삭제 대상 |
+| C1 | MUST: named export | EFFECTIVE | Checked all 312 files | |
+| C1 | MUST NOT: export default | VIOLATED | src/pages/Home.tsx:1 | Violation; not a React.lazy exception |
+| C3 | MUST: rethrow errors | WEAK | Rethrows, but error types are not classified | Falls short of grade baseline |
+| S-xxx | MUST: ... | STALE | The module was refactored to v2 | Rule needs updating |
+| S-yyy | All | OBSOLETE | The library was removed | Candidate for rule deletion |
 ```
 
-### 3-2. 보안/개인정보 특별 점검
+### 3-2. Special Security/Privacy Audit
 
-해당 등급의 보안/개인정보 기준으로 별도 점검한다. 이 항목들은 기존 규칙 유무와 무관하게 코드를 직접 검사한다.
+Audit separately against the security/privacy baseline for the grade. For these items, inspect the code directly regardless of whether existing rules cover them.
 
 ```bash
-# PII 필드 탐색
-grep -rn "email\|phone\|address\|birthdate\|ssn\|주민등록\|전화번호\|주소" --include="*.ts" --include="*.py" | grep -v node_modules | grep -v test
+# Search for PII fields
+grep -rn "email\|phone\|address\|birthdate\|ssn\|national_id\|resident_id\|mobile" --include="*.ts" --include="*.py" | grep -v node_modules | grep -v test
 
-# 암호화 여부
+# Encryption
 grep -rn "encrypt\|decrypt\|hash\|bcrypt\|argon\|aes\|crypto" --include="*.ts" --include="*.py" | grep -v node_modules
 
-# 접근 로깅
+# Access logging
 grep -rn "audit\|access.log\|activity.log" --include="*.ts" --include="*.py" | grep -v node_modules
 
-# 하드 삭제 vs 소프트 삭제
+# Hard delete vs. soft delete
 grep -rn "DELETE FROM\|\.delete(\|\.destroy(\|\.remove(" --include="*.ts" --include="*.py" | grep -v node_modules | grep -v test
 
-# 시크릿 노출
+# Secret exposure
 grep -rn "password.*=.*['\"].\{8,\}\|api.key.*=.*['\"].\{8,\}\|secret.*=.*['\"].\{8,\}" --include="*.ts" --include="*.py" --include="*.env" | grep -v node_modules | grep -v test | grep -v example
 ```
 
 ```markdown
-## 보안/개인정보 점검 (등급 X 보안 기준)
+## Security/Privacy Audit (Grade X security baseline)
 
-| # | 영역 | 기준 | 현재 상태 | Severity | 근거 |
+| # | Area | Baseline | Current State | Severity | Evidence |
 |---|------|------|---------|:--------:|------|
-| SEC-1 | PII 암호화 | 모든 PII at rest 암호화 | email 평문 저장 | Critical | models/user.ts:45 |
-| SEC-2 | 감사 로그 | PII 접근 전량 로깅 | 로깅 없음 | Critical | |
-| SEC-3 | 하드 삭제 | PII는 soft delete + 유예 후 퍼지 | 하드 삭제 존재 | High | user.service.ts:89 |
-| SEC-4 | 시크릿 | 코드 내 시크릿 제로 | .env에 API key | Medium | .env:12 |
+| SEC-1 | PII encryption | All PII encrypted at rest | email stored in plaintext | Critical | models/user.ts:45 |
+| SEC-2 | Audit logs | Log all PII access | No logging | Critical | |
+| SEC-3 | Hard delete | PII uses soft delete + purge after grace period | Hard deletes exist | High | user.service.ts:89 |
+| SEC-4 | Secrets | Zero secrets in code | API key in .env | Medium | .env:12 |
 ```
 
 ---
 
-## Step 4: 변경 목록 작성
+## Step 4: Write the Change List
 
-Step 2, 3의 결과를 종합해 규칙 변경 목록을 작성한다.
+Combine the results of Steps 2 and 3 into a list of rule changes.
 
-### 4-1. 추가할 규칙
+### 4-1. Rules to Add
 
-커버리지 갭과 상위 기준 미충족에서 도출한다.
+Derive these from coverage gaps and unmet higher-level baselines.
 
 ```markdown
-## 추가할 규칙
+## Rules to Add
 
-| # | 제안 ID | Tier | 이름 | 근거 | 우선순위 |
+| # | Proposed ID | Tier | Name | Rationale | Priority |
 |---|---------|------|------|------|:--------:|
-| 1 | C10-audit-logging | T2 | 감사 로깅 | 등급 보안 기준 미충족. PII 접근 로깅 전무 | Critical |
-| 2 | C11-data-retention | T2 | 데이터 보존/삭제 | GDPR 요구사항. hard delete 3건 발견 | Critical |
-| 3 | S-xxx | T3 | ... | 미커버 파일 23개가 이 도메인에 집중 | High |
+| 1 | C10-audit-logging | T2 | Audit logging | Grade security baseline not met. No PII access logging at all | Critical |
+| 2 | C11-data-retention | T2 | Data retention/deletion | GDPR requirement. 3 hard deletes found | Critical |
+| 3 | S-xxx | T3 | ... | 23 uncovered files are concentrated in this domain | High |
 
-각 제안에 대해 MUST/MUST NOT 초안을 작성한다:
+Write a MUST/MUST NOT draft for each proposal:
 
-### C10-audit-logging 초안
+### C10-audit-logging draft
 ## MUST
-- 개인정보 포함 데이터의 읽기/쓰기/삭제에 대해 감사 로그를 기록한다
-- 감사 로그에는 누가(userId), 언제(timestamp), 무엇을(target), 어떤 행위(action)를 포함한다
+- Record audit logs for reads/writes/deletes of data containing personal information
+- Audit logs include who (userId), when (timestamp), what (target), and which action (action)
 - ...
 
 ## MUST NOT
-- 감사 로그에 PII 원본 값을 포함하지 않는다 (마스킹 필수)
+- Do not include raw PII values in audit logs (masking required)
 - ...
 ```
 
-### 4-2. 제거할 규칙
+### 4-2. Rules to Remove
 
-OBSOLETE 판정된 규칙을 목록화한다.
+List the rules with an OBSOLETE verdict.
 
 ```markdown
-## 제거할 규칙
+## Rules to Remove
 
-| # | ID | 이름 | 근거 |
+| # | ID | Name | Rationale |
 |---|-----|------|------|
-| 1 | S-yyy | ... | 해당 라이브러리 제거됨. 트리거 매칭 파일 0개. |
+| 1 | S-yyy | ... | The library was removed. 0 files match the trigger. |
 ```
 
-### 4-3. 개정할 규칙
+### 4-3. Rules to Revise
 
-STALE, WEAK, CONFLICTING 판정된 규칙을 목록화하고 개정 방향을 제시한다.
+List the rules with a STALE, WEAK, or CONFLICTING verdict and propose the direction of revision.
 
 ```markdown
-## 개정할 규칙
+## Rules to Revise
 
-| # | ID | 판정 | 현재 | 개정 방향 | 우선순위 |
+| # | ID | Verdict | Current | Revision Direction | Priority |
 |---|-----|:----:|------|---------|:--------:|
-| 1 | C3 | WEAK | 에러 재전파만 요구 | 에러 타입 계층 + 구조화 요구 추가 (등급 기준) | High |
-| 2 | S-xxx | STALE | v1 API 기준 | v2 API 구조 반영 | Medium |
-| 3 | C1 vs S-zzz | CONFLICTING | C1의 MUST와 S-zzz의 MUST 충돌 | 우선순위 명시 또는 예외 추가 | Medium |
+| 1 | C3 | WEAK | Only requires rethrowing errors | Add requirements for an error type hierarchy + structure (grade baseline) | High |
+| 2 | S-xxx | STALE | Based on the v1 API | Reflect the v2 API structure | Medium |
+| 3 | C1 vs S-zzz | CONFLICTING | MUST in C1 conflicts with MUST in S-zzz | Specify precedence or add an exception | Medium |
 
-각 개정에 대해 변경 diff를 작성한다:
+Write a change diff for each revision:
 
-### C3 개정안
-## MUST (추가)
-+ 커스텀 에러 클래스를 정의하고 도메인별로 분류한다
-+ 에러 응답에 에러 코드(문자열)와 사용자 메시지를 분리한다
+### C3 revision proposal
+## MUST (added)
++ Define custom error classes and classify them by domain
++ Separate the error code (string) and the user message in error responses
 
-## MUST (변경)
-- 에러를 catch 후 반드시 재전파한다
-+ 에러를 catch 후 반드시 적절한 에러 타입으로 래핑하여 재전파한다
+## MUST (changed)
+- Always rethrow errors after catching them
++ Always wrap errors in an appropriate error type and rethrow them after catching
 
-## MUST NOT (추가)
-+ 제네릭 Error나 문자열만으로 throw하지 않는다
+## MUST NOT (added)
++ Do not throw a generic Error or a bare string
 ```
 
-### 4-4. INDEX.yaml 갱신
+### 4-4. Update INDEX.yaml
 
-트리거 변경이 필요한 항목을 목록화한다.
+List the items that require trigger changes.
 
 ```markdown
-## INDEX.yaml 갱신
+## INDEX.yaml Updates
 
-| # | 규칙 ID | 변경 유형 | 내용 |
+| # | Rule ID | Change Type | Details |
 |---|---------|---------|------|
-| 1 | C10 (신규) | 추가 | paths: ["**/models/**", "**/services/**"], patterns: ["PII", "personal"] |
-| 2 | S-yyy (삭제) | 제거 | 전체 트리거 삭제 |
-| 3 | S-xxx (개정) | 수정 | paths에 "v2/" 경로 추가 |
+| 1 | C10 (new) | Add | paths: ["**/models/**", "**/services/**"], patterns: ["PII", "personal"] |
+| 2 | S-yyy (deleted) | Remove | Delete all triggers |
+| 3 | S-xxx (revised) | Modify | Add "v2/" path to paths |
 ```
 
 ---
 
-## Step 5: 우선순위 정렬 및 실행 계획
+## Step 5: Prioritization and Execution Plan
 
-### 5-1. 변경 우선순위
+### 5-1. Change Priorities
 
 ```markdown
-## 실행 우선순위
+## Execution Priorities
 
-### P0 — 즉시 실행 (보안/개인정보, 등급 보안 기준 미충족)
-| # | 유형 | ID | 내용 |
+### P0 — Execute immediately (security/privacy, grade security baseline not met)
+| # | Type | ID | Details |
 |---|------|-----|------|
-| 1 | 추가 | C10-audit-logging | 감사 로깅 규칙 신설 |
-| 2 | 추가 | C11-data-retention | 데이터 보존/삭제 규칙 신설 |
+| 1 | Add | C10-audit-logging | Create audit logging rule |
+| 2 | Add | C11-data-retention | Create data retention/deletion rule |
 
-### P1 — 이번 주기 (일반 등급 기준 미충족, High)
-| # | 유형 | ID | 내용 |
+### P1 — This cycle (general grade baseline not met, High)
+| # | Type | ID | Details |
 |---|------|-----|------|
-| 1 | 개정 | C3 | 에러 처리 강화 |
-| 2 | 추가 | S-xxx | 미커버 도메인 규칙 |
+| 1 | Revise | C3 | Strengthen error handling |
+| 2 | Add | S-xxx | Rule for uncovered domain |
 
-### P2 — 다음 주기 (Medium, 트리거 정비)
-| # | 유형 | ID | 내용 |
+### P2 — Next cycle (Medium, trigger cleanup)
+| # | Type | ID | Details |
 |---|------|-----|------|
-| 1 | 제거 | S-yyy | 사용되지 않는 규칙 삭제 |
-| 2 | 개정 | S-xxx | v2 반영 |
-| 3 | 갱신 | INDEX.yaml | 트리거 정비 |
+| 1 | Remove | S-yyy | Delete unused rule |
+| 2 | Revise | S-xxx | Reflect v2 |
+| 3 | Update | INDEX.yaml | Clean up triggers |
 ```
 
-### 5-2. 실행 방법
+### 5-2. Execution Method
 
-- P0: 규칙 파일 생성/수정 → 전수 감사 → 위반 해소 리팩토링
-- P1: 규칙 파일 수정 → 관련 코드 감사 → 필요 시 리팩토링
-- P2: 규칙 파일 수정/삭제 → INDEX.yaml 갱신 → 인덱싱 검증
+- P0: Create/modify rule files → full audit → refactor to resolve violations
+- P1: Modify rule files → audit related code → refactor if needed
+- P2: Modify/delete rule files → update INDEX.yaml → verify indexing
 
 ---
 
-## Step 6: 보고서 작성
+## Step 6: Write the Report
 
 ```markdown
 # Rules Revision Report
 
-## 기준
-- 제품 분야: (분야)
-- 서비스 등급: (S/A/B/C/D)
-- 일반 기준: (등급에 따른 기준)
-- 보안/개인정보 기준: (등급에 따른 보안 기준)
-- 점검 일자: (날짜)
+## Baseline
+- Product domain: (domain)
+- Service grade: (S/A/B/C/D)
+- General baseline: (baseline for the grade)
+- Security/privacy baseline: (security baseline for the grade)
+- Audit date: (date)
 
-## 현재 상태
-- 규칙 파일: X개 (Principles X, Concerns X, Specifics X)
-- MUST/MUST NOT 항목: X개
-- 트리거 커버리지: X%
-- 미커버 파일: X개
+## Current State
+- Rule files: X (Principles X, Concerns X, Specifics X)
+- MUST/MUST NOT items: X
+- Trigger coverage: X%
+- Uncovered files: X
 
-## 점검 결과 요약
-- EFFECTIVE: X개 항목
-- VIOLATED: X개 항목
-- STALE: X개 항목
-- OBSOLETE: X개 항목
-- WEAK: X개 항목 (등급 기준 미달)
-- CONFLICTING: X개 항목
+## Audit Result Summary
+- EFFECTIVE: X items
+- VIOLATED: X items
+- STALE: X items
+- OBSOLETE: X items
+- WEAK: X items (below grade baseline)
+- CONFLICTING: X items
 
-## 보안/개인정보 특별 점검
-- 등급 보안 기준 미충족: X건 (Critical X, High X)
+## Special Security/Privacy Audit
+- Grade security baseline not met: X cases (Critical X, High X)
 
-## 변경 계획
-- 추가할 규칙: X개
-- 제거할 규칙: X개
-- 개정할 규칙: X개
-- INDEX.yaml 갱신: X건
+## Change Plan
+- Rules to add: X
+- Rules to remove: X
+- Rules to revise: X
+- INDEX.yaml updates: X
 
-## 실행 우선순위
-- P0 (즉시): X건
-- P1 (이번 주기): X건
-- P2 (다음 주기): X건
+## Execution Priorities
+- P0 (immediate): X
+- P1 (this cycle): X
+- P2 (next cycle): X
 
-## 상세
-(Step 4의 전체 내용)
+## Details
+(Full contents of Step 4)
 ```
 
 ---
 
-## 주의사항
+## Cautions
 
-- 기준은 Step 0에서 결정된 **서비스 등급**에 따른다. 등급 결정은 사용자 확인을 거친다. 등급이 결정되면 해당 기준을 일관되게 적용한다.
-- 규칙 추가 제안 시 **정적 분석으로 커버 가능한 항목은 제외**한다. 이 시스템은 LLM만이 판단할 수 있는 영역에 집중한다.
-- STALE/OBSOLETE 판정은 **코드를 직접 읽고** 확인한다. 규칙 파일의 last_verified 날짜만으로 판단하지 않는다.
-- 대규모 코드베이스는 배치로 나눠 수행한다. 한 세션에서 전체를 처리하지 않는다.
-- 개정안은 **초안**이다. 최종 확정 전에 사용자 검토를 받는다.
+- The baseline follows the **service grade** determined in Step 0. The grade decision goes through user confirmation. Once the grade is decided, apply its baseline consistently.
+- When proposing new rules, **exclude items that static analysis can cover**. This system focuses on areas that only an LLM can judge.
+- Confirm STALE/OBSOLETE verdicts by **reading the code directly**. Do not judge based solely on the last_verified date in the rule file.
+- Split large codebases into batches. Do not process the entire codebase in a single session.
+- Revision proposals are **drafts**. Get user review before final confirmation.

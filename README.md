@@ -1,271 +1,255 @@
+**English** | [한국어](./README.ko.md)
+
 # Baden
 
-AI 코딩 에이전트의 행동을 실시간으로 모니터링하는 로컬 도구.
+A local tool that monitors what your AI coding agent is doing, in real time.
 
-에이전트가 파일을 읽고, 코드를 수정하고, 테스트를 돌리는 모든 과정을 이벤트로 수집하여
-타임라인, 규칙 히트맵, 요약 대시보드로 시각화한다.
+Every step the agent takes — reading files, planning, editing code, running tests, checking
+project rules — is collected as an event and visualized as a live timeline, rule analytics,
+and cross-project dashboards.
 
-## 핵심 컨셉
+Works with **Claude Code** and **OpenAI Codex** through MCP.
 
-**자유 서술 → 사후 분류** — 에이전트는 고정된 이벤트 타입을 외울 필요 없이, 자신의 행동을 자유로운 snake_case 키워드로 보고한다. 서버가 첫 단어 기반 패턴 매칭으로 내부 이벤트 타입(`file_read`, `code_modify` 등)으로 자동 분류한다.
+## Core Ideas
 
-**보고 → 확인 → 실행** — 에이전트는 모든 행동을 실행 전에 Baden에 보고한다. 파일 읽기, 검색, 코드 수정, 테스트 실행 등 예외 없이 사전 보고 원칙을 따른다.
+**Free-form reporting, server-side classification** — The agent doesn't memorize a fixed list of
+event types. It describes each action with its own snake_case keyword (`read_auth_logic`,
+`modify_handler`), and the server maps it to an internal event type (`file_read`, `code_modify`, ...).
 
-## 아키텍처
+**Report, then act** — The agent reports every action to Baden *before* doing it: reads, searches,
+edits, and test runs alike.
+
+**Rules as the backbone** — Point Baden at a project's `rules/` directory and it tracks how often
+each rule is checked, violated, and fixed, so you can see which rules actually work.
+
+## Architecture
 
 ```
-AI 에이전트 (Claude Code, ...)
+AI agent (Claude Code, Codex)
     │
-    │  MCP 도구 호출 (stdio)
+    │  MCP tool calls (stdio)
     ▼
-Baden MCP Server ──HTTP POST──▶ /api/query ─── inferEventType() ─── SQLite
-                                                     │
-                                                WebSocket broadcast
-                                                     │
-                                                     ▼
-                                              React 대시보드
-                                          (타임라인 · 히트맵 · 로그)
+Baden MCP server ──HTTP POST──▶ /api/query ── classify action ── SQLite
+                                                   │
+                                           WebSocket broadcast
+                                                   │
+                                                   ▼
+                                           React dashboard
+                                (timeline · analysis · comparison)
 ```
+
+One server process (port `3800`) serves the API, the WebSocket, and the built dashboard.
+
+## Requirements
+
+- **Node.js** 20.19+ or 22.12+ (required by Vite 7)
+- **macOS** for the always-on service (`baden install` uses launchd).
+  On Linux, `baden start` and `baden run` can run Baden without the service, but this path is not
+  regularly tested. Windows is not supported.
 
 ## Quick Start
 
-### 1. 설치 및 빌드
+### 1. Install and build
 
 ```bash
-git clone <repository-url> baden
+git clone https://github.com/ibare/baden.git
 cd baden
-npm run build
-npm link          # `baden` 명령을 PATH 에 등록
+npm run build     # builds client, server, and mcp
+npm link          # puts the `baden` command on your PATH
 ```
 
-`npm run build` 는 `client`, `server`, `mcp` 세 모듈을 모두 빌드한다.
-`npm link` 를 생략하면 `baden` 대신 `node bin/baden.js` 로 실행해야 한다.
+Without `npm link`, run `node bin/baden.js` instead of `baden`.
 
-### 2. 상시 서비스로 등록 (권장, macOS)
+### 2. Run as a service (recommended)
 
 ```bash
 baden install
 ```
 
-`~/Library/LaunchAgents/com.baden.server.plist` 를 생성하고 launchd 에 등록한다.
+This writes `~/Library/LaunchAgents/com.baden.server.plist` and registers it with launchd.
 
-- **로그인할 때마다 자동 실행** — 콘솔을 띄울 필요가 없다
-- **비정상 종료 시 자동 복구** — `KeepAlive` 로 launchd 가 되살린다
-- **프로세스 1개** — 서버가 `client/dist` 를 정적 서빙하므로 3800 하나면 충분하다
+- **Starts automatically at login** — no terminal to keep open
+- **Restarts on crash** — launchd revives it after an abnormal exit
+- **A single process** — the server also serves the dashboard, so port `3800` is all you need
 
-MCP 서버가 `http://localhost:3800` 에 의존하므로, 상시 실행 상태여야 에이전트 보고가 유실되지 않는다.
+The MCP server sends every report to `http://localhost:3800`. If Baden isn't running, reports are
+dropped (the agent itself is never blocked), so keeping it running as a service is the easiest way
+not to lose data.
 
-#### ⚠️ 서비스는 `dist` 를 실행한다
+### 3. Open the dashboard
 
-`baden dev` 는 `tsx` 로 `src` 를 직접 실행하지만 **서비스는 빌드 산출물(`server/dist`)을 실행한다.**
-소스를 고쳤다면 반드시 아래를 거쳐야 서비스에 반영된다.
+http://localhost:3800
 
-```bash
-npm run build
-baden restart
-```
-
-`baden status` / `start` / `restart` / `install` 은 `dist` 가 `src` 보다 오래됐으면 경고한다.
-
-#### node 런타임 복사본
-
-launchd 는 로그인 셸을 거치지 않아 nvm 의 node 를 찾지 못한다.
-그래서 `baden install` 이 현재 node 를 `~/.baden/runtime/node` 로 복사하고, plist 가 이 고정 경로를 직접 실행한다.
-노드 버전을 바꿨다면 `baden install` 을 다시 실행해 복사본을 갱신한다.
-
-드물게 macOS 개인정보 보호(TCC)가 `~/Documents` 아래 접근을 막을 수 있다.
-그런 경우 `baden install` 이 `~/.baden/logs/launchd.log` 를 확인해 감지하고,
-`~/.baden/runtime/node` 에 "전체 디스크 접근" 권한을 부여하는 절차를 출력한다.
-
-> 프로젝트 디렉터리를 옮기면 plist 에 기록된 진입점 경로가 깨진다.
-> `baden status` 가 이를 감지해 알려주며, `baden install` 을 다시 실행하면 된다.
-
-해제는 `baden uninstall`.
-
-### 3. 서비스 없이 실행
-
-```bash
-# 데몬으로 실행 (백그라운드)
-baden start
-
-# 포트 지정
-baden start -p 4000
-
-# 포그라운드 실행 (디버깅용)
-baden run
-```
-
-서버가 시작되면:
-- **대시보드**: http://localhost:3800
-- **API**: http://localhost:3800/api
-- **WebSocket**: ws://localhost:3800/ws
-- **DB**: `~/.baden/baden.db` (자동 생성)
-- **로그**: `~/.baden/logs/` (날짜별 로테이션)
-
-### 4. CLI 명령어
-
-| 명령어 | 설명 |
-|--------|------|
-| `baden install [-p port]` | LaunchAgent 등록 — 로그인 시 자동 실행 |
-| `baden uninstall` | LaunchAgent 제거 |
-| `baden start [-p port]` | 시작 (등록돼 있으면 서비스, 아니면 데몬) |
-| `baden stop` | 중지 |
-| `baden restart` | 재시작 |
-| `baden status` | 실행 상태 및 헬스체크 |
-| `baden dev` | 개발 모드 (hot reload) |
-| `baden logs` | 최신 로그 tail |
-| `baden run [-p port]` | 포그라운드 실행 |
-
-`start` / `stop` / `status` 는 LaunchAgent 등록 여부를 먼저 확인해 `launchctl` 로 위임한다.
-데몬과 서비스가 동시에 3800 과 `baden.db` 를 잡는 일이 없다.
-
-### 5. 개발 모드
-
-```bash
-baden dev
-```
-
-상시 서비스를 잠시 정지하고 hot reload 서버를 띄운다.
-
-- 서버: http://localhost:3800 (tsx watch — `src` 를 직접 실행)
-- 클라이언트: http://localhost:3801 (Vite)
-
-**Ctrl+C 로 종료하면 서비스가 자동으로 복귀한다.** 자식 프로세스는 그룹째 정리되므로 고아가 남지 않는다.
-
-개별 실행이 필요하면:
-
-```bash
-npm run dev:server    # http://localhost:3800
-npm run dev:client    # http://localhost:3801
-```
+Data lives in `~/.baden/` — the database is `~/.baden/baden.db`, logs are in `~/.baden/logs/`.
 
 ---
 
-## 프로젝트 연동
+## Connecting a Project
 
-Baden으로 AI 에이전트를 모니터링하려면 두 가지 설정이 필요하다:
-1. **MCP 서버 등록** — 에이전트가 Baden 도구를 사용할 수 있게
-2. **CLAUDE.md 지침** — 에이전트가 매 행동마다 보고하도록 강제
+Three steps: **register the project** in Baden, **register the MCP server** with your agent, and
+**tell the agent to report** via `CLAUDE.md` (or `AGENTS.md` for Codex).
 
-### Step 1: MCP 서버 빌드
+> Register the project first. Reports that arrive for a project name Baden doesn't know are discarded.
 
-```bash
-cd baden
-npm run build:mcp
-```
+### Step 1: Register the project
 
-빌드 결과물: `mcp/dist/index.js`
+In the dashboard, click **+** (Add Project) in the sidebar and fill in:
 
-### Step 2: MCP 서버 등록
+| Field | Description |
+|---|---|
+| **Name** (required) | Must match the `Project Name` you put in `CLAUDE.md` exactly (case-sensitive) |
+| Description | Optional |
+| Rules Path | Absolute path to the project's `rules/` directory (the one containing `INDEX.yaml`). Optional — see [Rules](#rules) |
+| AI Agent | `Claude Code` or `Codex` |
 
-Claude Code의 MCP 설정에 Baden을 추가한다. 두 가지 방법 중 선택:
-
-#### 방법 A: 글로벌 등록 (`~/.claude.json`)
-
-모든 프로젝트에서 Baden 도구를 사용할 수 있게 된다.
-
-`~/.claude.json`의 `mcpServers` 섹션에 추가:
-
-```json
-{
-  "mcpServers": {
-    "baden": {
-      "command": "node",
-      "args": ["/absolute/path/to/baden/mcp/dist/index.js"],
-      "env": {
-        "BADEN_API_URL": "http://localhost:3800"
-      }
-    }
-  }
-}
-```
-
-#### 방법 B: 프로젝트별 등록 (`.mcp.json`)
-
-특정 프로젝트에서만 사용하려면, 모니터링할 프로젝트 루트에 `.mcp.json` 생성:
-
-```json
-{
-  "mcpServers": {
-    "baden": {
-      "command": "node",
-      "args": ["/absolute/path/to/baden/mcp/dist/index.js"],
-      "env": {
-        "BADEN_API_URL": "http://localhost:3800"
-      }
-    }
-  }
-}
-```
-
-> `args`의 경로는 반드시 **절대 경로**로 지정한다.
-
-### Step 3: CLAUDE.md에 모니터링 지침 추가
-
-MCP 도구가 연결되어도 에이전트가 자동으로 매번 호출하지는 않는다.
-모니터링할 프로젝트의 `CLAUDE.md`에 아래 지침을 추가하여 보고를 강제한다:
-
-```markdown
-## Baden Monitoring
-- Project Name: `my-project`
-
-이 프로젝트는 Baden 모니터링 하에 운영된다. 모든 행동에 대해 해당하는 baden MCP 도구를 호출하라.
-
-### 사용자 지시 수신
-사용자가 새로운 지시를 내리면, **작업을 시작하기 전에** `baden_start_task`를 호출하라.
-이후 같은 작업의 모든 도구 호출에 반환된 `taskId`를 사용하라.
-
-### 계획 수립 보고
-코드를 읽거나 수정하지 않더라도, **접근 방식을 결정하거나 계획을 세울 때** `baden_plan`을 호출하라.
-계획 모드(plan mode)에 진입했을 때도 동일하게 보고한다.
-
-### 행동 보고
-이후 모든 행동을 실행하기 **전에** `baden_action`을 호출하라.
-규칙 관련 행동은 `baden_rule`, 검증 행동은 `baden_verify`를 사용한다.
-
-### 작업 완료 보고
-작업이 완료되면 `baden_complete_task`를 호출하라.
-
-### 원칙
-- **보고 없이 행동하지 마라.** 파일 읽기, 검색, 테스트 실행 등 모든 행동은 Baden에 보고한 뒤 수행한다.
-- **계획 수립도 보고하라.** 접근 방식 결정, 계획 작성 등 도구를 사용하지 않는 사고 과정도 보고 대상이다.
-- **action은 자유롭게 서술하라.** 수행할 행동을 요약하는 snake_case 키워드를 직접 만들어 사용하라.
-- **reason은 구체적으로 기술하라.** 나중에 읽어도 맥락을 이해할 수 있는 설명을 작성하라.
-```
-
-> `Project Name`은 Baden 대시보드에서 프로젝트를 생성할 때 사용한 이름과 **정확히 일치**해야 한다.
-
-### Step 4: 프로젝트 등록
-
-Baden 대시보드(http://localhost:3800)에서 사이드바의 `+` 버튼으로 프로젝트를 생성한다.
-
-또는 API로 직접 등록:
+Or use the API:
 
 ```bash
 curl -X POST http://localhost:3800/api/projects \
   -H "Content-Type: application/json" \
-  -d '{"name":"my-project","description":"프로젝트 설명"}'
+  -d '{
+    "name": "my-project",
+    "description": "My project",
+    "rulesPath": "/absolute/path/to/my-project/rules",
+    "agent": "claude_code"
+  }'
 ```
 
-> `name`은 CLAUDE.md의 `Project Name`과 동일해야 한다. 에이전트가 보고할 때 이 이름으로 프로젝트를 찾는다.
+`agent` is `claude_code` (default) or `codex`.
 
-### 연동 확인
+> Project names must be unique — creating a second project with an existing name fails.
 
-설정이 완료되면 Claude Code에서 아무 작업을 지시해보자. 에이전트가 `baden_start_task`를 호출하고,
-이후 `baden_action`, `baden_plan` 등을 호출하면서 대시보드에 실시간으로 이벤트가 표시된다.
+### Step 2: Register the MCP server
+
+`npm run build` already built it to `mcp/dist/index.js`. (To rebuild only the MCP server: `npm run build:mcp`.)
+Always use an **absolute path**.
+
+**Claude Code — all projects** (`~/.claude.json`, under `mcpServers`):
+
+```json
+{
+  "mcpServers": {
+    "baden": {
+      "command": "node",
+      "args": ["/absolute/path/to/baden/mcp/dist/index.js"],
+      "env": {
+        "BADEN_API_URL": "http://localhost:3800"
+      }
+    }
+  }
+}
+```
+
+**Claude Code — one project**: put the same JSON in `.mcp.json` at that project's root.
+
+**Codex** (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.baden]
+command = "node"
+args = ["/absolute/path/to/baden/mcp/dist/index.js"]
+env = { BADEN_API_URL = "http://localhost:3800" }
+```
+
+If you installed the service on another port (`baden install -p 4000`), change `BADEN_API_URL` to match.
+
+### Step 3: Add the monitoring instructions
+
+Connecting the MCP server doesn't make the agent call it on every step. Add this block to the
+monitored project's `CLAUDE.md` (Claude Code) or `AGENTS.md` (Codex):
+
+```markdown
+## Baden Monitoring
+
+- Project Name: `my-project`
+- This project runs under Baden monitoring. Call the matching baden MCP tool for every action.
+
+### Receiving an instruction
+- When the user gives a new instruction, call `baden_start_task` **before starting work**.
+- Use the returned taskId in every later report for the same task.
+
+### Reporting plans
+- Call `baden_plan` whenever you decide on an approach or make a plan, even if you don't read or change any code.
+- This includes entering plan mode.
+
+### Reporting actions
+- Call `baden_action` **before** every action.
+- Use `baden_rule` for rule-related actions and `baden_verify` for verification.
+
+### Reporting completion
+- Call `baden_complete_task` when the task is done.
+
+### Principles
+- **Never act without reporting.** Report every read, search, and test before doing it.
+- **Report plans too.** Thinking that doesn't involve a tool call is still reportable.
+- **Describe actions freely.** Make up your own snake_case keyword that summarizes the action.
+- **Make reasons specific.** Write them so the context is clear when read later.
+```
+
+### Verify
+
+Give your agent any task. It should call `baden_start_task`, then `baden_plan`, `baden_action`, and
+so on, and the events should appear on the project's **Monitor** page in real time.
+
+If nothing shows up, check `baden status`, that the project name matches exactly, and the server log
+(`baden logs`) — unknown project names are logged there.
 
 ---
 
-## 서브에이전트 연동
+## Rules
 
-Claude Code의 서브에이전트(Agent tool로 실행되는 에이전트)는 **MCP 도구에 접근할 수 없다**.
-서브에이전트가 Baden에 보고하려면 HTTP 직접 호출 방식을 사용해야 한다.
+Baden is most useful when the project has a `rules/` directory that describes its coding rules.
+When a project has a **Rules Path**, Baden parses it, links `baden_rule` reports to individual rules,
+and builds per-rule analytics.
 
-### 접근 방식: Session Start Hook + curl 래퍼
+### Setting up rules with the bootstrap guides
 
-#### 1. Hook 스크립트 생성
+You don't have to write the rule system by hand. These prompts walk your agent through building it
+for an existing or new project — copy the one for your agent into a session and follow along:
 
-모니터링할 프로젝트에 `.claude/hooks/setup-baden.sh` 생성:
+| Guide | Use it for |
+|---|---|
+| [Rules Bootstrap Guide — Claude Code](./prompts/baden-rules-bootstrap-guide-claude.md) | Analyze the codebase, design a three-tier rule system (principles / concerns / specifics), write the rules and `INDEX.yaml`, run an initial audit, set up a Rule Guard subagent and `CLAUDE.md`, and connect Baden |
+| [Rules Bootstrap Guide — Codex](./prompts/baden-rules-bootstrap-guide-codex.md) | The same pipeline for Codex: `AGENTS.md`, `.codex/agents/*.toml`, skills, and `config.toml` |
+| [Rules Revision Prompt](./prompts/rules-revision-prompt.md) | Audit and revise an *existing* rule system against an industry baseline graded by the service profile, with stricter standards for security and personal data |
+
+Each guide also has a Korean version (`*.ko.md`).
+
+### Rule file format
+
+Baden reads `rules/INDEX.yaml`, which lists rules in three sections — `always`, `concerns`
+(IDs like `C1`), and `specifics` (IDs like `S-timeline`). Each entry has `id`, `file`,
+`description`, and `triggers` (`paths`, `patterns`, `imports`, `events`).
+
+In each rule file, Baden counts the bullet items under headings named exactly:
+
+```markdown
+## MUST
+## MUST NOT
+## PREFER
+```
+
+Keep these headings in English and at the `##` level, even if the rest of the file is in another language.
+
+### Syncing
+
+- Rules are synced when you set the Rules Path, and again with the **Sync** button in the
+  **Analysis → Rules** table.
+- When an agent reports a `ruleId`, Baden checks the rule files for changes (at most once every
+  30 seconds per project) and re-syncs automatically.
+- Syncing is diff-based: renamed rules keep their history, and deleted rules are marked `removed`
+  instead of being dropped.
+
+---
+
+## Reporting from Subagents
+
+A subagent whose `tools:` list is restricted may not be able to call the `baden_*` MCP tools.
+In that case, let it report over HTTP through a small wrapper script.
+
+### 1. Create a hook script
+
+In the monitored project, create `.claude/hooks/setup-baden.sh`:
 
 ```bash
 #!/bin/bash
@@ -278,11 +262,11 @@ SCRIPT
 chmod +x /tmp/baden-my-project
 ```
 
-> `my-project`를 실제 프로젝트 이름으로 변경한다.
+Replace `my-project` with the real project name.
 
-#### 2. Hook 등록
+### 2. Register the hook
 
-`.claude/settings.local.json`에 SessionStart hook으로 등록:
+In `.claude/settings.local.json`, run it on session start and allow the subagent to call it:
 
 ```json
 {
@@ -307,136 +291,283 @@ chmod +x /tmp/baden-my-project
 }
 ```
 
-`permissions.allow`에 `/tmp/baden-my-project` 실행 권한을 추가해야 서브에이전트가 자동으로 호출할 수 있다.
+### 3. Use it in the subagent definition
 
-#### 3. 서브에이전트 정의에서 사용
+In `.claude/agents/my-agent.md`:
 
-서브에이전트 정의 파일(`.claude/agents/my-agent.md`)에서 다음과 같이 사용:
-
-```markdown
+````markdown
 ---
 name: my-agent
 tools: Read, Glob, Grep, Bash
 ---
 
-## Baden 보고
+## Reporting to Baden
 
-모든 행동을 `/tmp/baden-my-project`를 통해 Baden에 보고한다.
-**MCP 도구(`baden_*`)는 서브에이전트에서 사용할 수 없다. 반드시 Bash로 `/tmp/baden-my-project`를 호출한다.**
+Report every action to Baden through `/tmp/baden-my-project`.
+Do not use the `baden_*` MCP tools — always call `/tmp/baden-my-project` with Bash.
 
-### 보고 형식
+### Format
 
 ```bash
-/tmp/baden-my-project '"action":"check_files","target":"src/index.ts","reason":"대상 파일 확인","taskId":"..."'
+/tmp/baden-my-project '"action":"check_files","target":"src/index.ts","reason":"Check the target file","taskId":"..."'
 ```
-```
+````
 
-#### 4. taskId 전달
+### 4. Pass the taskId
 
-메인 에이전트가 서브에이전트를 호출할 때, 현재 `taskId`를 프롬프트에 포함해야 한다:
-
-```
-CLAUDE.md에 다음과 같이 명시:
-
-→ rule-guard 호출 (사전 검토, **반드시 현재 taskId를 프롬프트에 포함**)
-```
-
-이렇게 하면 서브에이전트의 보고가 메인 에이전트의 태스크와 연결된다.
+When the main agent calls the subagent, it must include the current `taskId` in the prompt — say so in
+`CLAUDE.md`, for example: *"Call rule-guard for a pre-review. **Always include the current taskId in the
+prompt.**"* This links the subagent's reports to the main agent's task.
 
 ---
 
-## MCP 도구 레퍼런스
+## MCP Tool Reference
 
-| 도구 | 시점 | 주요 파라미터 |
-|------|------|--------------|
-| `baden_start_task` | 사용자 지시 수신 시 | `prompt`, `projectName` → `taskId` 반환 |
-| `baden_plan` | 계획/설계 시 | `taskId`, `action`, `reason` |
-| `baden_action` | 행동 실행 전 | `taskId`, `action`, `target?`, `reason?` |
-| `baden_verify` | 검증 완료 후 | `taskId`, `action`, `result`, `target?` |
-| `baden_rule` | 규칙 관련 활동 | `taskId`, `action`, `ruleId`, `severity?`, `target?`, `reason?` |
-| `baden_complete_task` | 작업 완료 시 | `taskId`, `summary` |
+| Tool | When | Parameters |
+|---|---|---|
+| `baden_start_task` | On receiving a user instruction | `prompt`, `projectName` → returns `taskId` |
+| `baden_plan` | When planning or deciding an approach | `taskId`, `action`, `reason` |
+| `baden_action` | Before any action | `taskId`, `action`, `target?`, `reason?` |
+| `baden_verify` | After tests, builds, lints, or other checks | `taskId`, `action`, `result`, `target?` |
+| `baden_rule` | Rule checks, violations, and fixes | `taskId`, `action`, `ruleId`, `severity?`, `target?`, `reason?` |
+| `baden_complete_task` | When the task is done | `taskId`, `summary` |
 
-### action 작성 규칙
+- `severity` is one of `critical`, `high`, `medium`, `low`.
+- Every tool returns `ok: true` even if the server is down, so monitoring never blocks the agent.
+  The `source` field tells you what happened: `server`, `server_error`, or `fallback`.
+- The link between a `taskId` and its project lives in the MCP server's memory. If the MCP server
+  restarts mid-task, start a new task with `baden_start_task`.
 
-`action`은 snake_case로 자유롭게 작성한다. **첫 단어**가 이벤트 분류를 결정한다:
+### Writing `action`
 
-| 첫 단어 | 분류 | 예시 |
-|---------|------|------|
-| `read`, `search`, `scan`, `find` | 탐색 | `read_auth_logic`, `search_usage` |
-| `plan`, `analyze`, `review`, `decide` | 계획 | `plan_refactor`, `analyze_requirements` |
-| `create`, `modify`, `write`, `fix`, `add` | 구현 | `modify_handler`, `create_migration` |
-| `test`, `build`, `lint`, `typecheck` | 검증 | `test_auth_flow`, `build_project` |
-| `rule`, `violation`, `check` | 규칙 | `check_c5_compliance`, `violation_found` |
+`action` is free-form snake_case. Baden splits it on `_` and uses the **first word it recognizes**,
+scanning left to right (`run` is skipped, so `run_test` counts as `test`):
 
-> `run_`은 skip word — `run_test`는 `test`로 분류된다.
+| Word | Event type | Lane | Example |
+|---|---|---|---|
+| `read`, `search`, `scan`, `find`, `trace`, `list`, `identify`, `understand` | `file_read` | Exploration | `read_auth_logic` |
+| `plan`, `analyze`, `review`, `decide`, `receive`, `task`, `compile`, `synthesize`, `finalize`, `confirm`, `report`, `adjust` | `task_analysis` | Planning | `plan_refactor` |
+| `create` | `code_create` | Implementation | `create_migration` |
+| `modify`, `edit`, `delete`, `rewrite`, `add`, `implement`, `update`, `write`, `harden`, `protect`, `apply`, `start`, `continue`, `skip` | `code_modify` | Implementation | `modify_handler` |
+| `rule`, `check` | `rule_match` | Rules | `check_c5_compliance` |
+| `violation` | `violation_found` | Rules | `violation_found` |
+| `fix` | `fix_applied` | Rules | `fix_null_guard` |
+| `verify`, `test`, `build`, `typecheck`, `lint`, `validate` | `build_run` | Rules | `test_auth_flow` |
+
+If no word matches, the event becomes `rule_match` when a `ruleId` is given, and a generic `query`
+(shown in Exploration) otherwise. `baden_complete_task` always produces `task_complete`.
+
+### Timeline lanes
+
+| Lane | What goes there |
+|---|---|
+| User | The instruction that started a task (`baden_start_task`) |
+| Exploration | Reading and searching the codebase, plus unclassified events |
+| Planning | Analysis, decisions, and task completion |
+| Implementation | Creating and modifying code |
+| Rules | Rule checks, violations, fixes, and verification (tests, builds, lints) |
+
+Lanes can be customized per project on the **Registry** page (see below).
+
+---
+
+## Dashboard
+
+### Home
+- Global stats and an activity heatmap across all projects
+- Project cards with event and rule counts, category breakdown, trend line, and agent badge
+- An activity timeline and rule violation map across projects
+- A live feed of incoming events from every project
+
+### Monitor (per project)
+- Lanes per category, with category filter toggles
+- **Gap compression** — idle stretches of 3+ minutes collapse so busy periods stay readable
+- **Long-event compression** for single events longer than the viewport
+- Three detail levels (collapsed / expanded / detailed) and a zoom slider (1–60 s per tick)
+- **Minimap** with a density heatmap for navigation
+- Drag-to-pan with inertia, **auto-follow** with a NOW line
+- **Task chains** — arrows connecting the events of a task
+- Date picker with a 30-day activity heatmap
+- **Rule strip** with check / violation / pass / fix counts
+- A resizable **Verification Cycles** panel
+- A pinnable, resizable **event drawer** with event details, the related rule (rendered Markdown),
+  and the other events of the same task
+
+### Analysis (per project)
+- Period: 30 days, 90 days, or all time
+- **Overview** — agent efficiency, violation trend, rule quality, and the rules table (with the Sync button)
+- **Insights** — behavior flow, phase time distribution, task duration, hourly activity, daily
+  productivity, task complexity, violation patterns, hotspot files, rule co-occurrence, and violation stories
+- **Rule detail** — weekly trend, most-violated files, violation history, and the rule's content
+
+### Compare
+Compare two or more projects side by side: workflow DNA, productivity timelines, task metrics and
+duration distributions, rule compliance, top violated rules, and a rule violation heatmap.
+
+### Registry (per project)
+Override how actions are grouped into lanes for one project:
+- **Action prefixes** map the leading word of an action (`read_`, `create_`, ...) to a lane
+- **Detail keywords** refine that choice based on words later in the action
+
+### Notifications
+The browser shows a notification when a task completes (`baden_complete_task`).
+
+---
+
+## Running Baden
+
+### CLI
+
+| Command | Description |
+|---|---|
+| `baden` | Same as `baden status` |
+| `baden install [-p port]` | Register the LaunchAgent and start it (starts at every login) |
+| `baden uninstall` | Unregister the LaunchAgent. `~/.baden` (database, logs) is kept |
+| `baden start [-p port]` | Start — the service if installed, otherwise a background daemon |
+| `baden stop` | Stop. An installed service still starts again at the next login |
+| `baden restart` | Restart |
+| `baden status` | Show state and run a health check |
+| `baden run [-p port] [--force]` | Run in the foreground, logging to the console |
+| `baden dev` | Development mode with hot reload (see below) |
+| `baden logs` | `tail -f` the latest daily log |
+
+- `start`, `stop`, and `status` detect an installed service and delegate to `launchctl`, so the service
+  and a daemon never fight over the port and database.
+- An installed service's port is fixed in the plist. To change it, run `baden install -p <port>` again;
+  `-p` on `start`/`stop`/`restart`/`status` only prints a warning.
+- `baden run` refuses to start while the service or a daemon is running. `--force` overrides this.
+
+### How the service works
+
+- launchd doesn't go through your login shell, so it can't find a Node.js installed with nvm.
+  `baden install` copies the current `node` binary to `~/.baden/runtime/node`, and the plist runs
+  `bin/daemon.js` with that copy directly. **After switching Node.js versions, run `baden install` again.**
+- The plist fixes `PORT`, `DB_PATH`, and `CLIENT_DIR` at install time, and restarts the server only
+  after an abnormal exit (`KeepAlive: { SuccessfulExit: false }`). launchd output goes to `~/.baden/logs/launchd.log`.
+- `baden install` refuses to run if the port is already in use, then waits up to 15 seconds for `/api/health`.
+
+### ⚠️ The service runs `dist`
+
+`baden dev` runs `src` directly with `tsx`, but **the service runs the build output (`server/dist`).**
+After changing the source, rebuild and restart:
+
+```bash
+npm run build
+baden restart
+```
+
+`baden install`, `start`, `restart`, and `status` warn you when `dist` is older than `src`.
+
+### Troubleshooting
+
+- **Moved the repository?** The plist points at the old path. `baden status` detects it — run `baden install` again.
+- **Permission errors under `~/Documents`?** macOS privacy protection (TCC) can occasionally block access.
+  `baden install` detects this in `launchd.log` and prints the steps to grant Full Disk Access to
+  `~/.baden/runtime/node`.
+- **Port already in use?** `lsof -nP -iTCP:3800 -sTCP:LISTEN` shows who holds it.
+
+### Development mode
+
+```bash
+baden dev
+```
+
+Pauses the service and starts hot-reload servers:
+
+- Server: http://localhost:3800 (`tsx watch`, runs `src` directly)
+- Client: http://localhost:3801 (Vite, proxies `/api` and `/ws` to port 3800)
+
+**Press Ctrl+C (or close the terminal) and the service comes back.** Child processes are cleaned up as
+a group, so none are left behind. `baden dev` needs `server/` and `client/` dependencies installed —
+it tells you to run `npm ci` if they're missing.
+
+To run the parts separately:
+
+```bash
+npm run dev:server    # http://localhost:3800
+npm run dev:client    # http://localhost:3801
+```
+
+### Environment variables
+
+| Variable | Used by | Default |
+|---|---|---|
+| `PORT` | Server | `3800` |
+| `DB_PATH` | Server | `~/.baden/baden.db` |
+| `CLIENT_DIR` | Server | `<repo>/client/dist` (set by the CLI) |
+| `BADEN_API_URL` | MCP server | `http://localhost:3800` |
+
+If you start `server/dist/index.js` yourself, set `CLIENT_DIR` to `<repo>/client/dist`, or the dashboard won't be served.
 
 ---
 
 ## API
 
-| Method | Path | 설명 |
-|--------|------|------|
-| `POST` | `/api/projects` | 프로젝트 등록 |
-| `GET` | `/api/projects` | 프로젝트 목록 |
-| `GET` | `/api/projects/:id` | 프로젝트 상세 |
-| `PUT` | `/api/projects/:id` | 프로젝트 수정 |
-| `GET` | `/api/projects/:id/rules` | 규칙 목록 |
-| `PUT` | `/api/projects/:id/sync` | 규칙 디렉토리 재스캔 |
-| `POST` | `/api/query` | 에이전트 행동 보고 (자유 서술) |
-| `POST` | `/api/events` | 이벤트 직접 수신 (단건/배치) |
-| `GET` | `/api/events` | 이벤트 조회 (projectId, type, date 필터) |
-| `GET` | `/api/events/dates` | 이벤트가 존재하는 날짜 목록 |
-| `GET` | `/api/projects/:id/action-registry` | 액션 패턴 목록 |
-| `POST` | `/api/projects/:id/action-registry` | 액션 패턴 생성 |
-| `GET` | `/api/projects/:id/action-registry/prefixes` | 액션 접두사 목록 |
-| `POST` | `/api/projects/:id/action-registry/prefixes` | 액션 접두사 생성 |
-| `WS` | `/ws?projectId=<id>` | 실시간 이벤트 스트리밍 |
+All endpoints are under `http://localhost:3800`.
+
+### Projects
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/projects` | Create a project — `{ name*, description?, rulesPath?, agent? }`. Syncs rules immediately when `rulesPath` is set |
+| `GET` | `/api/projects` | List projects |
+| `GET` | `/api/projects/:id` | Project detail with rules (`?includeRemoved=1` to include removed rules) |
+| `PUT` | `/api/projects/:id` | Update a project (re-syncs rules) |
+| `DELETE` | `/api/projects/:id` | Delete a project and all of its data |
+| `GET` | `/api/projects/:id/rules` | List rules (`?includeRemoved=1`) |
+| `GET` | `/api/projects/:id/rules/:ruleId` | Rule detail with per-type stats |
+| `GET` | `/api/projects/:id/rules/:ruleId/content` | Rule body as Markdown |
+| `PUT` | `/api/projects/:id/sync` | Re-sync rules from `rulesPath` |
+
+### Events
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/query` | Report agent actions (single or array) — `{ projectName*, action*, target?, reason?, ruleId?, severity?, taskId?, ... }`. Always returns `{ ok: true }`; unknown project names are logged and dropped |
+| `POST` | `/api/events` | Insert raw events (single or array). Requires `type` and `projectId` — use `/api/query` for agent reports |
+| `GET` | `/api/events` | Query events — `projectId`, `type`, `ruleId`, `taskId`, `date` (YYYY-MM-DD), `limit` (default 100), `offset` |
+| `GET` | `/api/events/dates` | Dates that have events, with counts (`?projectId`) |
+
+### Analytics
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/insights` | Summary of all projects for the home dashboard |
+| `GET` | `/api/analytics/rules/effectiveness` | `projectId*`, `ruleId?`, `days?` (default 90) |
+| `GET` | `/api/analytics/rules/quality` | `projectId*` |
+| `GET` | `/api/analytics/rules/:ruleId` | `projectId*` |
+| `GET` | `/api/analytics/agent/efficiency` | `projectId*`, `days?` (default 90) |
+| `GET` | `/api/analytics/insights` | `projectId*`, `days?` (default 90, `0` for all time) |
+| `GET` | `/api/analytics/compare` | `projectIds=a,b` |
+| `GET` | `/api/analytics/compare/deep` | `projectIds=a,b` |
+
+### Action registry
+
+All under `/api/projects/:projectId/action-registry`:
+
+| Method | Path | Description |
+|---|---|---|
+| `GET`, `POST` | `/` | List / create action patterns |
+| `PUT`, `DELETE` | `/:id` | Update / delete a pattern |
+| `POST` | `/bulk` | Confirm patterns in bulk (`{ ids: [] }`) |
+| `POST` | `/test` | Test a pattern (`{ pattern, pattern_type }`) |
+| `GET`, `POST` | `/prefixes` | List / create action prefixes |
+| `PUT`, `DELETE` | `/prefixes/:id` | Update / delete a prefix |
+| `GET`, `POST` | `/keywords` | List / create detail keywords |
+| `PUT`, `DELETE` | `/keywords/:id` | Update / delete a keyword |
+
+### Other
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/health` | `{ status: "ok", timestamp }` |
+| `WS` | `/ws?projectId=<id>` | Live events (`{ type: "event", data }`) and registry updates. Omit `projectId` to receive every project |
 
 ---
 
-## 이벤트 카테고리
+## Tech Stack
 
-| 카테고리 | 이벤트 타입 | 설명 |
-|----------|------------|------|
-| 탐색 | `code_search`, `file_read`, `doc_read`, `dependency_check` | 코드베이스를 읽거나 검색 |
-| 계획 | `task_analysis`, `approach_decision`, `task_complete` | 요구사항 분석, 방식 결정, 작업 완료 |
-| 구현 | `code_create`, `code_modify`, `refactor`, `file_write` | 코드 작성 및 수정 |
-| 검증 | `test_run`, `build_run`, `lint_run` | 테스트, 빌드, 린트 실행 |
-| 규칙 | `rule_match`, `violation_found`, `fix_applied` | 규칙 참조, 위반 발견, 수정 |
-
----
-
-## 주요 기능
-
-### 타임라인 시각화
-- 카테고리별 **레인(lane)** 분리 — User, 탐색, 계획, 구현, 규칙 준수
-- **Gap 압축** — 3분 이상 유휴 구간을 접어 밀도 높은 뷰 제공
-- **긴 이벤트 압축** — 뷰포트를 초과하는 단일 이벤트 처리
-- **3단계 확장 토글** — 축소 / 확장 / 상세
-- **미니맵** — 전체 타임라인 오버뷰 + 네비게이션
-- **마우스 드래그 패닝** — 관성 스크롤 지원
-- **태스크 체인 연결선** — L자형 라우팅 + 화살표
-
-### 액션 레지스트리
-- **접두사/키워드 2단계 분류** — `read_`, `create_` 등 접두사로 광역 분류 후 키워드 매칭으로 세부 오버라이드
-- 발견된 액션 패턴을 카테고리, 라벨, 아이콘으로 정의
-- 패턴 테스트 및 일괄 확인
-
-### 규칙 히트맵
-- `rules/` 디렉토리의 코딩 규칙을 파싱하여 등록
-- 규칙별 참조/위반/수정 빈도를 히트맵으로 표시
-- 규칙 본문 마크다운 렌더링
-
-### 이벤트 드로어
-- 고정(pin) 가능한 사이드바
-- 이벤트 상세 정보 + 관련 규칙 표시
-- 리사이즈 가능
-
----
-
-## 기술 스택
-
-- **Server**: Node.js + Express + TypeScript + WebSocket(ws) + SQLite(better-sqlite3)
-- **Client**: React 19 + Vite + Tailwind CSS v4 + Recharts + Radix UI + Phosphor Icons
-- **MCP**: @modelcontextprotocol/sdk (stdio transport)
-- **Ports**: Server `3800`, Client dev `3801`
+- **Server**: Node.js, Express, TypeScript, WebSocket (`ws`), SQLite (`better-sqlite3`)
+- **Client**: React 19, Vite 7, Tailwind CSS v4, Recharts, Radix UI, Phosphor Icons, react-router
+- **MCP**: `@modelcontextprotocol/sdk` (stdio transport)
+- **Ports**: server `3800`, client dev server `3801`
