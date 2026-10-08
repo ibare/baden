@@ -83,14 +83,45 @@ http://localhost:3800
 
 ---
 
-## 프로젝트 연결
+## 프로젝트 셋업
 
-세 단계로 이루어진다. Baden 에 **프로젝트를 등록**하고, 에이전트에 **MCP 서버를 등록**하고,
-`CLAUDE.md`(Codex 는 `AGENTS.md`)로 **에이전트에게 보고하라고 알려 준다**.
+모니터링할 프로젝트에는 Baden 을 위해 몇 가지를 갖춰야 한다. 트랙은 두 가지다 — A 로 시작하고,
+준비가 되면 언제든 B 로 넘어간다.
+
+| | 트랙 A: 모니터링만 | 트랙 B: 규칙과 Rule Guard |
+|---|---|---|
+| 얻는 것 | 에이전트가 하는 모든 일을 보여 주는 실시간 타임라인 | 트랙 A 에 더해, 규칙별 확인 / 위반 / 수정 추적과 모든 변경을 검토하는 Rule Guard 서브에이전트 |
+| 드는 노력 | 10분 정도 | 여러 세션 — 에이전트가 사용자와 함께 규칙 체계를 만든다 |
+| 단계 | [A-1 – A-4](#트랙-a-모니터링만) | [B-1 – B-5](#트랙-b-규칙과-rule-guard) |
+
+### 셋업 후 생기는 파일
+
+Claude Code 의 경우:
+
+```
+my-project/
+├── CLAUDE.md                    # Baden Monitoring 블록 (A) + Rule Guard 와 규칙 섹션 (B)
+├── .mcp.json                    # 프로젝트 단위로 등록할 때의 MCP 서버 (A)
+├── rules/                       # (B)
+│   ├── INDEX.yaml
+│   ├── principles.md
+│   ├── concerns/C1-….md
+│   └── specifics/S-….md
+└── .claude/
+    ├── agents/rule-guard.md     # (B)
+    ├── hooks/setup-baden.sh     # (B) 서브에이전트용 보고 래퍼를 만든다
+    ├── settings.json            # (B) 이 훅을 실행하고 래퍼 호출을 허용한다
+    └── settings.local.json      # (B) 컨텍스트 압축 훅
+```
+
+Codex 의 경우에는 [Codex 가이드](./prompts/baden-rules-bootstrap-guide-codex.ko.md)가 대신 `AGENTS.md`,
+`.codex/agents/*.toml`, `.codex/skills/`, `scripts/baden-report.sh` 를 만든다.
+
+### 트랙 A: 모니터링만
 
 > 프로젝트를 먼저 등록한다. Baden 이 모르는 프로젝트 이름으로 들어온 보고는 버려진다.
 
-### 1단계: 프로젝트 등록
+#### A-1. 프로젝트 등록
 
 대시보드 사이드바에서 **+** (Add Project) 를 누르고 다음을 채운다.
 
@@ -98,7 +129,7 @@ http://localhost:3800
 |---|---|
 | **Name** (필수) | `CLAUDE.md` 에 적은 `Project Name` 과 정확히 같아야 한다 (대소문자 구분) |
 | Description | 선택 |
-| Rules Path | 프로젝트의 `rules/` 디렉터리(`INDEX.yaml` 이 들어 있는 곳)의 절대 경로. 선택 — [규칙](#규칙) 참고 |
+| Rules Path | 프로젝트의 `rules/` 디렉터리(`INDEX.yaml` 이 들어 있는 곳). **Browse** 를 눌러 고른다. 트랙 A 에서는 비워 둔다 |
 | AI Agent | `Claude Code` 또는 `Codex` |
 
 API 를 써도 된다.
@@ -118,7 +149,7 @@ curl -X POST http://localhost:3800/api/projects \
 
 > 프로젝트 이름은 겹칠 수 없다. 이미 있는 이름으로 프로젝트를 만들면 실패한다.
 
-### 2단계: MCP 서버 등록
+#### A-2. MCP 서버 등록
 
 `npm run build` 가 이미 `mcp/dist/index.js` 로 빌드해 두었다. (MCP 서버만 다시 빌드하려면 `npm run build:mcp`.)
 경로는 언제나 **절대 경로**를 쓴다.
@@ -152,7 +183,7 @@ env = { BADEN_API_URL = "http://localhost:3800" }
 
 서비스를 다른 포트로 설치했다면(`baden install -p 4000`) `BADEN_API_URL` 도 그에 맞게 바꾼다.
 
-### 3단계: 모니터링 지침 추가
+#### A-3. 모니터링 지침 추가
 
 MCP 서버를 연결했다고 해서 에이전트가 모든 단계마다 이를 호출하지는 않는다. 모니터링할 프로젝트의
 `CLAUDE.md`(Claude Code) 또는 `AGENTS.md`(Codex)에 다음 블록을 추가한다.
@@ -185,7 +216,7 @@ MCP 서버를 연결했다고 해서 에이전트가 모든 단계마다 이를 
 - **이유를 구체적으로 쓴다.** 나중에 읽었을 때 맥락이 이해되는 수준으로 쓴다.
 ```
 
-### 확인
+#### A-4. 확인
 
 에이전트에게 아무 작업이나 맡긴다. 에이전트가 `baden_start_task` 를 호출하고 이어서 `baden_plan`,
 `baden_action` 등을 호출하면, 해당 프로젝트의 **Monitor** 페이지에 이벤트가 실시간으로 나타나야 한다.
@@ -193,32 +224,89 @@ MCP 서버를 연결했다고 해서 에이전트가 모든 단계마다 이를 
 아무것도 나타나지 않으면 `baden status`, 프로젝트 이름이 정확히 일치하는지, 그리고 서버 로그
 (`baden logs`)를 확인한다 — 알 수 없는 프로젝트 이름은 서버 로그에 남는다.
 
+### 트랙 B: 규칙과 Rule Guard
+
+에이전트가 부트스트랩 가이드를 Phase 별로 따라가며 프로젝트의 규칙 체계를 만든다.
+사용자는 Phase 마다 결과를 검토하고, 그 결과를 Baden 에 연결한다.
+
+| 가이드 | 용도 |
+|---|---|
+| [규칙 부트스트랩 가이드 — Claude Code](./prompts/baden-rules-bootstrap-guide-claude.ko.md) | 코드베이스를 분석하고, 3단 규칙 체계(원칙 / 관심사 / 세부 사항)를 설계하고, 규칙과 `INDEX.yaml` 을 쓰고, 첫 점검을 돌리고, Rule Guard 서브에이전트를 갖추고, Baden 을 연결한다 |
+| [규칙 부트스트랩 가이드 — Codex](./prompts/baden-rules-bootstrap-guide-codex.ko.md) | 같은 과정을 Codex 용으로: `AGENTS.md`, `.codex/agents/*.toml`, 스킬, `config.toml` |
+| [규칙 개정 프롬프트](./prompts/rules-revision-prompt.ko.md) | 나중에: *이미 있는* 규칙 체계를 서비스 성격에 따라 등급을 매긴 업계 기준에 비추어 점검하고 고친다. 보안과 개인정보에는 더 엄격한 기준을 적용한다 |
+
+각 가이드는 영문판(`*.md`)도 있다.
+
+#### B-1. 프로젝트에 맞는 경로 고르기
+
+| 프로젝트 | 실행할 내용 |
+|---|---|
+| 새 프로젝트 (아직 코드 없음) | Phase 1 은 건너뛴다. `principles.md` 와 핵심 관심사를 먼저 쓰고(Phase 2–3), 세부 사항은 코드가 쌓이면서 더한다. 점검과 리팩터링(Phase 4–5)은 건너뛴다 |
+| 초기 (~1만 줄까지) | Phase 1 은 가볍게 한다. 주요 패턴만 규칙으로 옮기고(관심사 3–5개, 세부 사항 2–3개), 가볍게 점검한 뒤 넘어간다 |
+| 성숙 (~5만 줄 이상) | 모든 Phase 를 실행한다: 철저한 분석, 전체 계층 구조, 전체 점검, 체계적인 리팩터링 |
+
+#### B-2. 가이드를 한 단계씩 실행
+
+가이드 전체를 세션에 붙여 넣지 않는다. 에이전트에게 파일을 가리켜 주고, Phase 하나를 실행하고,
+결과를 검토한 뒤 다음 Phase 를 시작한다. 예를 들면 다음과 같다.
+
+```
+/absolute/path/to/baden/prompts/baden-rules-bootstrap-guide-claude.ko.md 를 읽어 줘.
+이 프로젝트의 규칙 체계를 만들려고 해 (성숙한 코드베이스, 약 6만 줄).
+Phase 1 만 실행해서 rules/_analysis.md 를 쓰고, 멈춘 다음 내가 검토할 수 있게 요약해 줘.
+```
+
+그다음 *"Phase 2 를 실행해 줘"* 하는 식으로 이어 간다. 점검과 리팩터링 Phase(4–5)는 보통 여러 세션이
+걸린다 — 가이드가 이를 배치와 트랙으로 나눠 진행한다. Phase 6 은 Rule Guard 를 갖춘다.
+Phase 7 전에 멈추고 B-3 을 먼저 한다.
+
+#### B-3. Rules Path 로 프로젝트 등록
+
+[A-1](#a-1-프로젝트-등록)과 [A-2](#a-2-mcp-서버-등록)를 하되, **Rules Path** 를 가이드가 만든 `rules/`
+디렉터리로 설정한다. 이미 등록한 프로젝트라면 사이드바에서 해당 프로젝트의 편집(연필) 아이콘을 눌러
+Rules Path 를 설정한다. Baden 은 규칙을 곧바로 동기화한다 — **Analysis → Rules** 에서 확인한다.
+
+#### B-4. 에이전트가 Baden 을 연결 (가이드 Phase 7)
+
+등록한 프로젝트 이름을 에이전트에게 알려 주고 Phase 7 을 실행하라고 한다. 에이전트는 다음을 한다.
+
+- `CLAUDE.md` 에 [Baden Monitoring 블록](#a-3-모니터링-지침-추가)을 추가하고, 메인 에이전트가 현재 `taskId` 를
+  Rule Guard 에 넘기라는 줄도 함께 넣는다
+- Rule Guard 가 Baden 에 보고할 수 있게 해 주는 SessionStart 훅과 래퍼를 만든다 ([서브에이전트에서 보고하기](#서브에이전트에서-보고하기))
+- `rule-guard.md` 에 보고 섹션을 추가한다
+
+#### B-5. 확인
+
+**새** 세션을 시작하고(SessionStart 훅이 실행되도록) 에이전트에게 코드를 바꾸는 작업을 맡긴다. 다음을 확인한다.
+
+- [ ] **Monitor** 페이지에 이벤트가 실시간으로 나타난다
+- [ ] **Analysis → Rules** 에 `INDEX.yaml` 의 규칙이 나열된다
+- [ ] Rule Guard 의 사전 검토와 사후 검증이 같은 작업 아래 **Rules** 레인에 규칙 ID 와 함께 나타난다
+- [ ] `/tmp/baden-my-project` 가 있다 (Rule Guard 보고가 빠져 있다면 훅이 실행되지 않은 것이다)
+
+### 실제 예시
+
+Baden 자체 저장소가 트랙 B 로 셋업되어 있다. 참고용으로 볼 수 있다.
+
+| 경로 | 설명 |
+|---|---|
+| [`rules/`](./rules/) | Baden 자신의 규칙. Baden 의 에이전트가 실제로 따른다 (한국어) |
+| [`.claude/agents/rule-guard.md`](./.claude/agents/rule-guard.md) | Baden 보고를 갖춘 Rule Guard |
+| [`.claude/hooks/setup-baden.sh`](./.claude/hooks/setup-baden.sh), [`.claude/settings.json`](./.claude/settings.json) | 보고 래퍼 훅 |
+| [`CLAUDE.md`](./CLAUDE.md) | 규칙, Rule Guard, Baden Monitoring 섹션 (한국어) |
+
 ---
 
 ## 규칙
 
-Baden 은 프로젝트에 코딩 규칙을 적어 둔 `rules/` 디렉터리가 있을 때 가장 쓸모 있다.
-프로젝트에 **Rules Path** 가 설정되어 있으면 Baden 은 이를 해석하고, `baden_rule` 보고를 개별 규칙에
+프로젝트에 **Rules Path** 가 설정되어 있으면 Baden 은 그 규칙을 해석하고, `baden_rule` 보고를 개별 규칙에
 연결하고, 규칙별 분석을 만든다.
-
-### 부트스트랩 가이드로 규칙 세우기
-
-규칙 체계를 손으로 직접 쓸 필요는 없다. 아래 프롬프트들은 기존 프로젝트나 새 프로젝트에서 에이전트가
-규칙 체계를 만들어 가도록 이끈다 — 쓰는 에이전트에 맞는 것을 세션에 복사해 넣고 따라가면 된다.
-
-| 가이드 | 용도 |
-|---|---|
-| [규칙 부트스트랩 가이드 — Claude Code](./prompts/baden-rules-bootstrap-guide-claude.ko.md) | 코드베이스를 분석하고, 3단 규칙 체계(원칙 / 관심사 / 세부 사항)를 설계하고, 규칙과 `INDEX.yaml` 을 쓰고, 첫 점검을 돌리고, Rule Guard 서브에이전트와 `CLAUDE.md` 를 갖추고, Baden 을 연결한다 |
-| [규칙 부트스트랩 가이드 — Codex](./prompts/baden-rules-bootstrap-guide-codex.ko.md) | 같은 과정을 Codex 용으로: `AGENTS.md`, `.codex/agents/*.toml`, 스킬, `config.toml` |
-| [규칙 개정 프롬프트](./prompts/rules-revision-prompt.ko.md) | *이미 있는* 규칙 체계를 서비스 성격에 따라 등급을 매긴 업계 기준에 비추어 점검하고 고친다. 보안과 개인정보에는 더 엄격한 기준을 적용한다 |
-
-각 가이드는 영문판(`*.md`)도 있다.
 
 ### 규칙 파일 형식
 
-Baden 은 `rules/INDEX.yaml` 을 읽는다. 이 파일은 규칙을 세 구역으로 나눠 나열한다 — `always`,
+Baden 은 Rules Path 안의 `INDEX.yaml` 을 읽는다. 이 파일은 규칙을 세 구역으로 나눠 나열한다 — `always`,
 `concerns`(`C1` 같은 ID), `specifics`(`S-timeline` 같은 ID). 각 항목에는 `id`, `file`,
-`description`, `triggers`(`paths`, `patterns`, `imports`, `events`)가 있다.
+`description`, `triggers`(`paths`, `patterns`, `imports`, `events`)가 있다. `file` 은 Rules Path 기준 상대 경로다.
 
 Baden 은 각 규칙 파일에서 이름이 정확히 다음과 같은 제목 아래의 글머리 항목을 센다.
 
@@ -244,28 +332,30 @@ Baden 은 각 규칙 파일에서 이름이 정확히 다음과 같은 제목 �
 ## 서브에이전트에서 보고하기
 
 `tools:` 목록이 제한된 서브에이전트는 `baden_*` MCP 도구를 호출하지 못할 수 있다.
-이럴 때는 작은 래퍼 스크립트를 통해 HTTP 로 보고하게 한다.
+이럴 때는 SessionStart 훅이 만들어 두는 작은 래퍼 스크립트를 통해 HTTP 로 보고하게 한다.
+예시의 `my-project` 는 등록한 프로젝트 이름으로 바꾼다.
 
 ### 1. 훅 스크립트 만들기
 
-모니터링할 프로젝트에 `.claude/hooks/setup-baden.sh` 를 만든다.
+모니터링할 프로젝트에 `.claude/hooks/setup-baden.sh` 를 만들고 실행 권한을 준다(`chmod +x`).
 
 ```bash
 #!/bin/bash
+# /tmp 는 재부팅하면 비워지므로 세션이 시작될 때마다 래퍼를 다시 만든다.
 cat > /tmp/baden-my-project << 'SCRIPT'
 #!/bin/bash
-curl -s -X POST http://localhost:3800/api/query \
+# 보고에 실패해도 에이전트를 막지 않도록 언제나 0 으로 끝낸다
+curl -s -m 3 -X POST "${BADEN_API_URL:-http://localhost:3800}/api/query" \
   -H 'Content-Type: application/json' \
-  -d "{\"projectName\":\"my-project\",$1}"
+  -d "{\"projectName\":\"my-project\",$1}" || true
+exit 0
 SCRIPT
 chmod +x /tmp/baden-my-project
 ```
 
-`my-project` 는 실제 프로젝트 이름으로 바꾼다.
-
 ### 2. 훅 등록
 
-`.claude/settings.local.json` 에서 세션 시작 때 이 스크립트를 실행하고, 서브에이전트가 호출할 수 있도록 허용한다.
+`.claude/settings.json` 에서 세션이 시작될 때마다 이 스크립트를 실행하고, 서브에이전트가 래퍼를 호출할 수 있도록 허용한다.
 
 ```json
 {
@@ -281,7 +371,7 @@ chmod +x /tmp/baden-my-project
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/setup-baden.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/setup-baden.sh"
           }
         ]
       }
@@ -289,6 +379,9 @@ chmod +x /tmp/baden-my-project
   }
 }
 ```
+
+`matcher` 를 비워 두면 재부팅 뒤와 컨텍스트 압축 뒤를 포함해 세션이 시작될 때마다 실행된다.
+`settings.json` 과 `settings.local.json` 의 훅은 둘 다 실행되므로, 가이드가 만드는 컨텍스트 압축 훅과 함께 쓸 수 있다.
 
 ### 3. 서브에이전트 정의에서 사용
 
@@ -304,6 +397,7 @@ tools: Read, Glob, Grep, Bash
 
 모든 행동을 `/tmp/baden-my-project` 를 통해 Baden 에 보고한다.
 `baden_*` MCP 도구는 쓰지 않는다 — 언제나 Bash 로 `/tmp/baden-my-project` 를 호출한다.
+래퍼가 없으면 보고를 건너뛰고, 그 사실을 결과에 적는다.
 
 ### 형식
 
@@ -312,11 +406,13 @@ tools: Read, Glob, Grep, Bash
 ```
 ````
 
+규칙별 보고까지 담은 전체 예시는 [`.claude/agents/rule-guard.md`](./.claude/agents/rule-guard.md) 를 본다.
+
 ### 4. taskId 전달
 
 메인 에이전트가 서브에이전트를 호출할 때는 프롬프트에 현재 `taskId` 를 반드시 넣어야 한다 — 이를
-`CLAUDE.md` 에 적어 둔다. 예: *"사전 검토를 위해 rule-guard 를 호출한다. **프롬프트에 현재 taskId 를
-항상 포함한다.**"* 이렇게 하면 서브에이전트의 보고가 메인 에이전트의 작업에 연결된다.
+`CLAUDE.md` 에 적어 둔다. 예: *"rule-guard 를 호출할 때는 프롬프트에 현재 taskId 를 항상 포함한다."*
+이렇게 하면 서브에이전트의 보고가 메인 에이전트의 작업에 연결된다.
 
 ---
 

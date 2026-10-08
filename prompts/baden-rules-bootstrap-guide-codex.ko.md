@@ -513,11 +513,30 @@ developer_instructions = """
 - 구조 변경은 변경 이유를 설명 가능해야 한다.
 
 ## Baden Monitoring
-- 이 프로젝트는 Baden 모니터링 하에서 운영된다.
-- 사용자 지시를 받으면 작업 시작 전에 Baden에 시작 보고를 한다.
-- 접근 방식을 정하면 Baden에 계획 보고를 한다.
-- 코드 수정 시작 전, 검증 시작 전, 작업 종료 시 Baden에 보고한다.
-- 보고가 누락되면 즉시 보완하고 이후 단계를 진행한다.
+
+- Project Name: `my-project`
+- 이 프로젝트는 Baden 모니터링 하에서 운영된다. 모든 행동에 대해 해당 baden MCP 도구를 호출한다.
+
+### 사용자 지시 수신
+- 사용자가 새 지시를 내리면 `baden_start_task`를 호출한다. **작업 시작 전에 호출할 것.**
+- 반환된 taskId를 이후 같은 작업의 모든 보고에 사용한다.
+
+### 계획 보고
+- 코드를 읽거나 수정하지 않더라도, 접근 방식을 정하거나 계획을 세울 때 `baden_plan`을 호출한다.
+- 계획 모드(plan mode)에 들어갈 때도 마찬가지다.
+
+### 행동 보고
+- `baden_action`을 모든 행동 **실행 전에** 호출한다.
+- 규칙 관련 행동에는 `baden_rule`, 검증 행동에는 `baden_verify`를 사용한다.
+
+### 작업 완료 보고
+- 작업이 완료되면 `baden_complete_task`를 호출한다.
+
+### 원칙
+- **보고 없이 행동하지 않는다.** 모든 읽기, 검색, 테스트는 보고 후 수행한다.
+- **계획도 보고한다.** 도구 호출이 아닌 사고 과정도 보고 대상이다.
+- **행동을 자유롭게 기술한다.** snake_case 키워드를 직접 만들어 행동을 요약한다.
+- **이유를 구체적으로 쓴다.** 나중에 읽었을 때 맥락이 이해되는 수준으로 쓴다.
 
 ## Operational Constraint
 - hooks가 있다고 가정하지 않는다.
@@ -538,13 +557,22 @@ Codex에서는 Baden 연동을 다음 세 가지 방식 중 하나로 운영한�
 
 자동 훅을 전제하지 않으므로, 보고는 명시적 워크플로우 단계로 수행한다.
 
-## 8-1. 프로젝트 등록
+셋업 절차의 정본은 Baden README 다
+([프로젝트 셋업](../README.ko.md#프로젝트-셋업)). 이 단계는 그 절차를 Codex 프로젝트에 적용한다.
 
-Baden 대시보드 또는 API로 프로젝트를 등록한다.
+## 8-1. 선행 조건 (사용자가 할 일)
 
-## 8-2. 보고 이벤트 모델
+진행하기 전에 다음을 사용자에게 확인받고, 등록한 프로젝트 이름을 알려 달라고 요청한다.
 
-최소한 다음 이벤트를 사용한다.
+- Baden 이 설치되어 실행 중이다 (`baden status`)
+- Baden 대시보드에 프로젝트가 등록되어 있고, **AI Agent** 는 Codex, **Rules Path** 는 이 프로젝트 `rules/` 디렉터리의 절대 경로로 지정되어 있다
+- Baden MCP 서버가 Codex 에 등록되어 있다 (Phase 11 또는 [README — A-2](../README.ko.md#a-2-mcp-서버-등록) 참고)
+
+`AGENTS.md` 의 `## Baden Monitoring` 블록(Phase 7)은 [README — A-3](../README.ko.md#a-3-모니터링-지침-추가) 의 블록과 같다. `Project Name` 은 등록한 이름으로 지정한다.
+
+## 8-2. 보고 도구
+
+MCP 서버를 쓸 때는 다음 도구로 보고한다.
 
 - `baden_start_task`
 - `baden_plan`
@@ -580,47 +608,65 @@ Baden 대시보드 또는 API로 프로젝트를 등록한다.
 ## 8-5. INDEX.yaml 연동
 
 Baden은 프로젝트의 `rules/INDEX.yaml`을 파싱해 규칙 메타데이터를 등록한다. 규칙별 참조/위반/수정 빈도가 대시보드에서 추적된다.
+`## MUST`, `## MUST NOT`, `## PREFER` 제목은 영어 그대로 둔다 — Baden 이 그 아래 항목 수를 센다.
 
 ---
 
 # Phase 9: Baden 스크립트 방식
 
-MCP 대신 스크립트로 보고할 수 있다.
+MCP 대신 스크립트로 보고할 수 있다. 예를 들어 MCP 도구를 호출할 수 없는 서브에이전트에서 쓴다.
+스크립트는 MCP 도구가 보내는 것과 같은 보고를 `POST /api/query` 로 보낸다.
+
+> 스크립트는 네트워크로 `localhost` 를 호출한다. `network_access = false` 인 샌드박스에서는 호출이 막히므로,
+> MCP 서버를 우선 쓰거나 보고하는 프로필에 네트워크 접근을 허용한다.
 
 ## `scripts/baden-report.sh`
 
 ```bash
 #!/usr/bin/env bash
-set -euo pipefail
+# Baden 에 보고한다. 보고가 실패해도 에이전트를 막지 않도록 항상 0 으로 종료한다.
+set -uo pipefail
 
 PROJECT_NAME="${BADEN_PROJECT_NAME:-your-project}"
+BADEN_API_URL="${BADEN_API_URL:-http://localhost:3800}"
 ACTION="${1:-}"
 REASON="${2:-}"
 TASK_ID="${3:-}"
 
 if [ -z "$ACTION" ]; then
   echo "usage: baden-report.sh <action> <reason> [taskId]" >&2
-  exit 1
+  exit 0
 fi
 
-curl -s -X POST http://localhost:3800/api/events \
+# receive_task 는 작업을 시작한다: reason 이 사용자 지시가 된다 (User 레인에 표시)
+PROMPT=""
+if [ "$ACTION" = "receive_task" ]; then PROMPT="$REASON"; fi
+
+curl -s -m 3 -X POST "$BADEN_API_URL/api/query" \
   -H "Content-Type: application/json" \
   -d "$(jq -nc \
     --arg projectName "$PROJECT_NAME" \
     --arg action "$ACTION" \
     --arg reason "$REASON" \
     --arg taskId "$TASK_ID" \
-    '{projectName:$projectName, action:$action, reason:$reason, taskId:$taskId}')"
+    --arg prompt "$PROMPT" \
+    '{projectName:$projectName, action:$action, reason:$reason, taskId:$taskId}
+     + (if $prompt != "" then {prompt:$prompt} else {} end)')" || true
+exit 0
 ```
 
 ## 사용 예시
 
+`action` 은 자유 형식의 snake_case 키워드이며, 포함된 단어로 분류된다 ([README — action 작성법](../README.ko.md#action-작성법) 참고).
+`baden_start_task` 같은 MCP 도구 이름을 action 으로 넘기지 않는다. taskId 는 작업마다 하나 만들어 재사용한다.
+
 ```bash
-scripts/baden-report.sh baden_start_task "사용자 요청 수신: 규칙 시스템 초기화"
-scripts/baden-report.sh baden_plan "rules 구조를 먼저 분석하고 INDEX.yaml 초안을 작성"
-scripts/baden-report.sh baden_action "C2 위반 해소를 위해 서비스 레이어 분리 시작" "task-123"
-scripts/baden-report.sh baden_verify "리팩토링 후 테스트와 rule-guard 검증 수행" "task-123"
-scripts/baden-report.sh baden_complete_task "Track B 완료" "task-123"
+TASK_ID=$(uuidgen)
+scripts/baden-report.sh receive_task "규칙 시스템 초기화" "$TASK_ID"
+scripts/baden-report.sh plan_index_structure "rules 구조를 먼저 분석하고 INDEX.yaml 초안을 작성" "$TASK_ID"
+scripts/baden-report.sh modify_service_layer "C2 위반 해소를 위해 서비스 레이어 분리" "$TASK_ID"
+scripts/baden-report.sh verify_refactoring "리팩토링 후 테스트와 rule-guard 검증 수행" "$TASK_ID"
+scripts/baden-report.sh task_complete "Track B 완료" "$TASK_ID"
 ```
 
 ---
@@ -691,8 +737,9 @@ description: Baden 보고 절차를 일관되게 수행하는 운영 스킬
 model = "gpt-5-codex"
 
 [mcp_servers.baden]
-command = "npx"
-args = ["-y", "baden-mcp-server"]
+command = "node"
+args = ["/absolute/path/to/baden/mcp/dist/index.js"]
+env = { BADEN_API_URL = "http://localhost:3800" }
 enabled = true
 
 [sandbox_workspace_write]

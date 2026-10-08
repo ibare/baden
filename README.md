@@ -84,14 +84,45 @@ Data lives in `~/.baden/` — the database is `~/.baden/baden.db`, logs are in `
 
 ---
 
-## Connecting a Project
+## Setting Up Your Project
 
-Three steps: **register the project** in Baden, **register the MCP server** with your agent, and
-**tell the agent to report** via `CLAUDE.md` (or `AGENTS.md` for Codex).
+Baden needs a few things in the project you want to monitor. There are two tracks — start with A
+and move on to B whenever you're ready.
+
+| | Track A: Monitoring only | Track B: Rules and Rule Guard |
+|---|---|---|
+| You get | A live timeline of everything the agent does | Track A, plus per-rule check / violation / fix tracking and a Rule Guard subagent that reviews every change |
+| Effort | About 10 minutes | Several sessions — an agent builds the rule system with you |
+| Steps | [A-1 – A-4](#track-a-monitoring-only) | [B-1 – B-5](#track-b-rules-and-rule-guard) |
+
+### What you end up with
+
+For Claude Code:
+
+```
+my-project/
+├── CLAUDE.md                    # Baden Monitoring block (A) + Rule Guard and rules sections (B)
+├── .mcp.json                    # MCP server, if you register it per project (A)
+├── rules/                       # (B)
+│   ├── INDEX.yaml
+│   ├── principles.md
+│   ├── concerns/C1-….md
+│   └── specifics/S-….md
+└── .claude/
+    ├── agents/rule-guard.md     # (B)
+    ├── hooks/setup-baden.sh     # (B) creates the reporting wrapper for subagents
+    ├── settings.json            # (B) runs that hook and allows the wrapper
+    └── settings.local.json      # (B) context-compaction hook
+```
+
+For Codex, the [Codex guide](./prompts/baden-rules-bootstrap-guide-codex.md) produces `AGENTS.md`,
+`.codex/agents/*.toml`, `.codex/skills/`, and `scripts/baden-report.sh` instead.
+
+### Track A: Monitoring only
 
 > Register the project first. Reports that arrive for a project name Baden doesn't know are discarded.
 
-### Step 1: Register the project
+#### A-1. Register the project
 
 In the dashboard, click **+** (Add Project) in the sidebar and fill in:
 
@@ -99,7 +130,7 @@ In the dashboard, click **+** (Add Project) in the sidebar and fill in:
 |---|---|
 | **Name** (required) | Must match the `Project Name` you put in `CLAUDE.md` exactly (case-sensitive) |
 | Description | Optional |
-| Rules Path | Absolute path to the project's `rules/` directory (the one containing `INDEX.yaml`). Optional — see [Rules](#rules) |
+| Rules Path | The project's `rules/` directory (the one containing `INDEX.yaml`). Click **Browse** to pick it. Leave empty for Track A |
 | AI Agent | `Claude Code` or `Codex` |
 
 Or use the API:
@@ -119,7 +150,7 @@ curl -X POST http://localhost:3800/api/projects \
 
 > Project names must be unique — creating a second project with an existing name fails.
 
-### Step 2: Register the MCP server
+#### A-2. Register the MCP server
 
 `npm run build` already built it to `mcp/dist/index.js`. (To rebuild only the MCP server: `npm run build:mcp`.)
 Always use an **absolute path**.
@@ -153,7 +184,7 @@ env = { BADEN_API_URL = "http://localhost:3800" }
 
 If you installed the service on another port (`baden install -p 4000`), change `BADEN_API_URL` to match.
 
-### Step 3: Add the monitoring instructions
+#### A-3. Add the monitoring instructions
 
 Connecting the MCP server doesn't make the agent call it on every step. Add this block to the
 monitored project's `CLAUDE.md` (Claude Code) or `AGENTS.md` (Codex):
@@ -186,7 +217,7 @@ monitored project's `CLAUDE.md` (Claude Code) or `AGENTS.md` (Codex):
 - **Make reasons specific.** Write them so the context is clear when read later.
 ```
 
-### Verify
+#### A-4. Verify
 
 Give your agent any task. It should call `baden_start_task`, then `baden_plan`, `baden_action`, and
 so on, and the events should appear on the project's **Monitor** page in real time.
@@ -194,32 +225,90 @@ so on, and the events should appear on the project's **Monitor** page in real ti
 If nothing shows up, check `baden status`, that the project name matches exactly, and the server log
 (`baden logs`) — unknown project names are logged there.
 
+### Track B: Rules and Rule Guard
+
+An agent builds the rule system for your project by following a bootstrap guide, phase by phase.
+You review each phase, then connect the result to Baden.
+
+| Guide | Use it for |
+|---|---|
+| [Rules Bootstrap Guide — Claude Code](./prompts/baden-rules-bootstrap-guide-claude.md) | Analyze the codebase, design a three-tier rule system (principles / concerns / specifics), write the rules and `INDEX.yaml`, run an initial audit, set up a Rule Guard subagent, and connect Baden |
+| [Rules Bootstrap Guide — Codex](./prompts/baden-rules-bootstrap-guide-codex.md) | The same pipeline for Codex: `AGENTS.md`, `.codex/agents/*.toml`, skills, and `config.toml` |
+| [Rules Revision Prompt](./prompts/rules-revision-prompt.md) | Later on: audit and revise an *existing* rule system against an industry baseline graded by the service profile, with stricter standards for security and personal data |
+
+Each guide also has a Korean version (`*.ko.md`).
+
+#### B-1. Pick a path for your project
+
+| Project | What to run |
+|---|---|
+| New (no code yet) | Skip Phase 1. Write `principles.md` and the core concerns first (Phases 2–3), and add specifics as code accumulates. Skip the audit and refactoring (Phases 4–5) |
+| Early (up to ~10K lines) | A quick Phase 1. Codify only the main patterns (3–5 concerns, 2–3 specifics), run a light audit, then move on |
+| Mature (~50K+ lines) | Every phase: a thorough analysis, the full tier structure, a full audit, and systematic refactoring |
+
+#### B-2. Run the guide one phase at a time
+
+Don't paste the whole guide into a session. Point the agent at the file, run one phase, and review the
+result before starting the next. For example:
+
+```
+Read /absolute/path/to/baden/prompts/baden-rules-bootstrap-guide-claude.md.
+We're building the rule system for this project (a mature codebase, about 60K lines).
+Run Phase 1 only, write rules/_analysis.md, then stop and summarize it for my review.
+```
+
+Then continue with *"Run Phase 2"*, and so on. The audit and refactoring phases (4–5) usually take
+several sessions — the guide splits them into batches and tracks. Phase 6 sets up Rule Guard.
+Stop before Phase 7 and do B-3 first.
+
+#### B-3. Register the project with its Rules Path
+
+Do [A-1](#a-1-register-the-project) and [A-2](#a-2-register-the-mcp-server), setting **Rules Path** to the
+`rules/` directory the guide created. If the project is already registered, click its edit (pencil)
+icon in the sidebar and set Rules Path there. Baden syncs the rules immediately — check
+**Analysis → Rules**.
+
+#### B-4. Let the agent connect Baden (guide Phase 7)
+
+Tell the agent the registered project name and ask it to run Phase 7. It will:
+
+- Add the [Baden Monitoring block](#a-3-add-the-monitoring-instructions) to `CLAUDE.md`, plus a line telling
+  the main agent to pass the current `taskId` to Rule Guard
+- Create the SessionStart hook and wrapper that let Rule Guard report to Baden ([Reporting from Subagents](#reporting-from-subagents))
+- Add a reporting section to `rule-guard.md`
+
+#### B-5. Verify
+
+Start a **new** session (so the SessionStart hook runs) and give the agent a task that changes code. Check that:
+
+- [ ] Events appear on the **Monitor** page in real time
+- [ ] **Analysis → Rules** lists the rules from `INDEX.yaml`
+- [ ] Rule Guard's pre-review and post-verification appear in the **Rules** lane with rule IDs, under the same task
+- [ ] `/tmp/baden-my-project` exists (if Rule Guard reports are missing, the hook didn't run)
+
+### A working example
+
+Baden's own repository is set up with Track B. Use it as a reference:
+
+| Path | What it is |
+|---|---|
+| [`rules/`](./rules/) | Baden's own rules, which its agent follows (in Korean) |
+| [`.claude/agents/rule-guard.md`](./.claude/agents/rule-guard.md) | Rule Guard with Baden reporting |
+| [`.claude/hooks/setup-baden.sh`](./.claude/hooks/setup-baden.sh), [`.claude/settings.json`](./.claude/settings.json) | The reporting wrapper hook |
+| [`CLAUDE.md`](./CLAUDE.md) | Rules, Rule Guard, and Baden Monitoring sections (in Korean) |
+
 ---
 
 ## Rules
 
-Baden is most useful when the project has a `rules/` directory that describes its coding rules.
-When a project has a **Rules Path**, Baden parses it, links `baden_rule` reports to individual rules,
-and builds per-rule analytics.
-
-### Setting up rules with the bootstrap guides
-
-You don't have to write the rule system by hand. These prompts walk your agent through building it
-for an existing or new project — copy the one for your agent into a session and follow along:
-
-| Guide | Use it for |
-|---|---|
-| [Rules Bootstrap Guide — Claude Code](./prompts/baden-rules-bootstrap-guide-claude.md) | Analyze the codebase, design a three-tier rule system (principles / concerns / specifics), write the rules and `INDEX.yaml`, run an initial audit, set up a Rule Guard subagent and `CLAUDE.md`, and connect Baden |
-| [Rules Bootstrap Guide — Codex](./prompts/baden-rules-bootstrap-guide-codex.md) | The same pipeline for Codex: `AGENTS.md`, `.codex/agents/*.toml`, skills, and `config.toml` |
-| [Rules Revision Prompt](./prompts/rules-revision-prompt.md) | Audit and revise an *existing* rule system against an industry baseline graded by the service profile, with stricter standards for security and personal data |
-
-Each guide also has a Korean version (`*.ko.md`).
+When a project has a **Rules Path**, Baden parses its rules, links `baden_rule` reports to individual
+rules, and builds per-rule analytics.
 
 ### Rule file format
 
-Baden reads `rules/INDEX.yaml`, which lists rules in three sections — `always`, `concerns`
+Baden reads `INDEX.yaml` in the Rules Path, which lists rules in three sections — `always`, `concerns`
 (IDs like `C1`), and `specifics` (IDs like `S-timeline`). Each entry has `id`, `file`,
-`description`, and `triggers` (`paths`, `patterns`, `imports`, `events`).
+`description`, and `triggers` (`paths`, `patterns`, `imports`, `events`). `file` is relative to the Rules Path.
 
 In each rule file, Baden counts the bullet items under headings named exactly:
 
@@ -245,28 +334,30 @@ Keep these headings in English and at the `##` level, even if the rest of the fi
 ## Reporting from Subagents
 
 A subagent whose `tools:` list is restricted may not be able to call the `baden_*` MCP tools.
-In that case, let it report over HTTP through a small wrapper script.
+In that case, let it report over HTTP through a small wrapper script that a SessionStart hook creates.
+In the examples, replace `my-project` with the registered project name.
 
 ### 1. Create a hook script
 
-In the monitored project, create `.claude/hooks/setup-baden.sh`:
+In the monitored project, create `.claude/hooks/setup-baden.sh` and make it executable (`chmod +x`):
 
 ```bash
 #!/bin/bash
+# /tmp is cleared on reboot, so recreate the wrapper at every session start.
 cat > /tmp/baden-my-project << 'SCRIPT'
 #!/bin/bash
-curl -s -X POST http://localhost:3800/api/query \
+# Always exit 0 so a failed report never blocks the agent
+curl -s -m 3 -X POST "${BADEN_API_URL:-http://localhost:3800}/api/query" \
   -H 'Content-Type: application/json' \
-  -d "{\"projectName\":\"my-project\",$1}"
+  -d "{\"projectName\":\"my-project\",$1}" || true
+exit 0
 SCRIPT
 chmod +x /tmp/baden-my-project
 ```
 
-Replace `my-project` with the real project name.
-
 ### 2. Register the hook
 
-In `.claude/settings.local.json`, run it on session start and allow the subagent to call it:
+In `.claude/settings.json`, run it at every session start and allow subagents to call the wrapper:
 
 ```json
 {
@@ -282,7 +373,7 @@ In `.claude/settings.local.json`, run it on session start and allow the subagent
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/setup-baden.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/setup-baden.sh"
           }
         ]
       }
@@ -290,6 +381,9 @@ In `.claude/settings.local.json`, run it on session start and allow the subagent
   }
 }
 ```
+
+The empty `matcher` runs it on every session start, including after a reboot and after context compaction.
+Hooks in `settings.json` and `settings.local.json` both run, so this coexists with the compaction hook from the guide.
 
 ### 3. Use it in the subagent definition
 
@@ -305,6 +399,7 @@ tools: Read, Glob, Grep, Bash
 
 Report every action to Baden through `/tmp/baden-my-project`.
 Do not use the `baden_*` MCP tools — always call `/tmp/baden-my-project` with Bash.
+If the wrapper is missing, skip reporting and say so in your result.
 
 ### Format
 
@@ -313,11 +408,13 @@ Do not use the `baden_*` MCP tools — always call `/tmp/baden-my-project` with 
 ```
 ````
 
+For a full example with per-rule reports, see [`.claude/agents/rule-guard.md`](./.claude/agents/rule-guard.md).
+
 ### 4. Pass the taskId
 
 When the main agent calls the subagent, it must include the current `taskId` in the prompt — say so in
-`CLAUDE.md`, for example: *"Call rule-guard for a pre-review. **Always include the current taskId in the
-prompt.**"* This links the subagent's reports to the main agent's task.
+`CLAUDE.md`, for example: *"When calling rule-guard, always include the current taskId in the prompt."*
+This links the subagent's reports to the main agent's task.
 
 ---
 

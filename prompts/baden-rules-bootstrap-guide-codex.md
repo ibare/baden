@@ -513,11 +513,30 @@ Check the pre-review result before modifying, and leave clear reasons for the ch
 - Structural changes must have an explainable reason.
 
 ## Baden Monitoring
-- This project operates under Baden monitoring.
-- When you receive a user instruction, send a start report to Baden before starting the task.
-- When you decide on an approach, send a plan report to Baden.
-- Report to Baden before starting code changes, before starting verification, and at the end of the task.
-- If a report is missed, fill it in immediately before proceeding to the next step.
+
+- Project Name: `my-project`
+- This project runs under Baden monitoring. Call the matching baden MCP tool for every action.
+
+### Receiving an instruction
+- When the user gives a new instruction, call `baden_start_task` **before starting work**.
+- Use the returned taskId in every later report for the same task.
+
+### Reporting plans
+- Call `baden_plan` whenever you decide on an approach or make a plan, even if you don't read or change any code.
+- This includes entering plan mode.
+
+### Reporting actions
+- Call `baden_action` **before** every action.
+- Use `baden_rule` for rule-related actions and `baden_verify` for verification.
+
+### Reporting completion
+- Call `baden_complete_task` when the task is done.
+
+### Principles
+- **Never act without reporting.** Report every read, search, and test before doing it.
+- **Report plans too.** Thinking that doesn't involve a tool call is still reportable.
+- **Describe actions freely.** Make up your own snake_case keyword that summarizes the action.
+- **Make reasons specific.** Write them so the context is clear when read later.
 
 ## Operational Constraint
 - Do not assume hooks exist.
@@ -538,13 +557,22 @@ In Codex, Baden integration runs in one of the following three ways.
 
 Since automatic hooks are not assumed, reporting is performed as explicit workflow steps.
 
-## 8-1. Project Registration
+The Baden README is the canonical source for the setup steps
+([Setting Up Your Project](../README.md#setting-up-your-project)). This phase applies them to a Codex project.
 
-Register the project via the Baden dashboard or API.
+## 8-1. Prerequisites (the user does these)
 
-## 8-2. Reporting Event Model
+Ask the user to confirm the following before continuing, and to tell you the registered project name:
 
-Use at least the following events.
+- Baden is installed and running (`baden status`)
+- The project is registered in the Baden dashboard with **AI Agent** set to Codex and **Rules Path** set to the absolute path of this project's `rules/` directory
+- The Baden MCP server is registered with Codex (see Phase 11, or [README — A-2](../README.md#a-2-register-the-mcp-server))
+
+The `## Baden Monitoring` block in `AGENTS.md` (Phase 7) is the same block as [README — A-3](../README.md#a-3-add-the-monitoring-instructions). Set `Project Name` to the registered name.
+
+## 8-2. Reporting Tools
+
+With the MCP server, report with these tools.
 
 - `baden_start_task`
 - `baden_plan`
@@ -580,47 +608,65 @@ Call `baden_action` **before executing** every action. Use `baden_rule` for rule
 ## 8-5. INDEX.yaml Integration
 
 Baden parses the project's `rules/INDEX.yaml` and registers rule metadata. Reference/violation/fix frequency per rule is tracked on the dashboard.
+Keep the `## MUST`, `## MUST NOT`, and `## PREFER` headings in English — Baden counts the bullets under them.
 
 ---
 
 # Phase 9: Baden Script Approach
 
-You can report via a script instead of MCP.
+You can report via a script instead of MCP — for example from a subagent that can't call MCP tools.
+The script sends the same reports the MCP tools send, to `POST /api/query`.
+
+> The script calls `localhost` over the network. In a sandbox with `network_access = false` the call is blocked,
+> so prefer the MCP server, or allow network access for the profile that reports.
 
 ## `scripts/baden-report.sh`
 
 ```bash
 #!/usr/bin/env bash
-set -euo pipefail
+# Reports to Baden. Always exits 0 so a failed report never blocks the agent.
+set -uo pipefail
 
 PROJECT_NAME="${BADEN_PROJECT_NAME:-your-project}"
+BADEN_API_URL="${BADEN_API_URL:-http://localhost:3800}"
 ACTION="${1:-}"
 REASON="${2:-}"
 TASK_ID="${3:-}"
 
 if [ -z "$ACTION" ]; then
   echo "usage: baden-report.sh <action> <reason> [taskId]" >&2
-  exit 1
+  exit 0
 fi
 
-curl -s -X POST http://localhost:3800/api/events \
+# receive_task starts a task: the reason is the user's instruction (shown in the User lane)
+PROMPT=""
+if [ "$ACTION" = "receive_task" ]; then PROMPT="$REASON"; fi
+
+curl -s -m 3 -X POST "$BADEN_API_URL/api/query" \
   -H "Content-Type: application/json" \
   -d "$(jq -nc \
     --arg projectName "$PROJECT_NAME" \
     --arg action "$ACTION" \
     --arg reason "$REASON" \
     --arg taskId "$TASK_ID" \
-    '{projectName:$projectName, action:$action, reason:$reason, taskId:$taskId}')"
+    --arg prompt "$PROMPT" \
+    '{projectName:$projectName, action:$action, reason:$reason, taskId:$taskId}
+     + (if $prompt != "" then {prompt:$prompt} else {} end)')" || true
+exit 0
 ```
 
 ## Usage Examples
 
+`action` is a free-form snake_case keyword, classified by its words (see [README — Writing action](../README.md#writing-action)).
+Do not pass MCP tool names such as `baden_start_task` as the action. Generate one taskId per task and reuse it.
+
 ```bash
-scripts/baden-report.sh baden_start_task "Received user request: initialize the rule system"
-scripts/baden-report.sh baden_plan "Analyze the rules structure first and draft INDEX.yaml"
-scripts/baden-report.sh baden_action "Start separating the service layer to resolve the C2 violation" "task-123"
-scripts/baden-report.sh baden_verify "Run tests and rule-guard verification after refactoring" "task-123"
-scripts/baden-report.sh baden_complete_task "Track B complete" "task-123"
+TASK_ID=$(uuidgen)
+scripts/baden-report.sh receive_task "Initialize the rule system" "$TASK_ID"
+scripts/baden-report.sh plan_index_structure "Analyze the rules structure first and draft INDEX.yaml" "$TASK_ID"
+scripts/baden-report.sh modify_service_layer "Separate the service layer to resolve the C2 violation" "$TASK_ID"
+scripts/baden-report.sh verify_refactoring "Run tests and rule-guard verification after refactoring" "$TASK_ID"
+scripts/baden-report.sh task_complete "Track B complete" "$TASK_ID"
 ```
 
 ---
@@ -691,8 +737,9 @@ Ensure Baden reports are not missed at the major steps of a task.
 model = "gpt-5-codex"
 
 [mcp_servers.baden]
-command = "npx"
-args = ["-y", "baden-mcp-server"]
+command = "node"
+args = ["/absolute/path/to/baden/mcp/dist/index.js"]
+env = { BADEN_API_URL = "http://localhost:3800" }
 enabled = true
 
 [sandbox_workspace_write]

@@ -432,55 +432,122 @@ tools: Read, Glob, Grep, Bash
 ## Phase 7: Baden 연동 (선택)
 
 Baden을 사용하면 규칙 준수 여부가 실시간으로 관측 가능해진다.
+셋업 절차의 기준 문서는 Baden README다
+([프로젝트 셋업](../README.ko.md#프로젝트-셋업)). 이 단계는 그 절차를 방금 셋업한 프로젝트에 적용한다.
 
-### 프로젝트 등록
+### 7-1. 사전 준비 (사용자가 수행)
 
-Baden 대시보드 또는 API로 프로젝트를 등록한다.
+진행하기 전에 사용자에게 다음 항목을 확인받고, 등록한 프로젝트 이름을 알려 달라고 요청한다:
 
-### CLAUDE.md에 Baden 보고 지침 추가
+- Baden이 설치되어 실행 중이다 (`baden status`)
+- Baden 대시보드에 프로젝트가 등록되어 있고, **Rules Path**가 이 프로젝트 `rules/` 디렉터리의 절대 경로로 설정되어 있다
+- Baden MCP 서버가 Claude Code에 등록되어 있다 ([README — A-2](../README.ko.md#a-2-mcp-서버-등록))
 
-```markdown
-## Baden Monitoring
-- Project Name: `(프로젝트명)`
-- 이 프로젝트는 Baden 모니터링 하에서 운영된다. 모든 행동에 대해 해당 baden MCP 도구를 호출한다.
+### 7-2. CLAUDE.md에 Baden Monitoring 지침 추가
 
-### 사용자 지시 수신
-- 사용자가 새 지시를 내리면 `baden_start_task`를 호출한다. **작업 시작 전에 호출할 것.**
-- 반환된 taskId를 이후 같은 작업의 모든 보고에 사용한다.
+[README — A-3](../README.ko.md#a-3-모니터링-지침-추가)의 `## Baden Monitoring` 블록을 그대로 CLAUDE.md에 복사하고,
+`Project Name`을 등록한 이름으로 설정한다. 내용을 고쳐 쓰지 않는다.
 
-### 계획 보고
-- 코드를 읽거나 수정하지 않더라도, 접근 방식을 정하거나 계획을 세울 때 `baden_plan`을 호출한다.
-
-### 행동 보고
-- `baden_action`을 모든 행동 **실행 전에** 호출한다.
-- 규칙 관련 행동에는 `baden_rule`, 검증 행동에는 `baden_verify`를 사용한다.
-
-### 작업 완료 보고
-- 작업이 완료되면 `baden_complete_task`를 호출한다.
-
-### 원칙
-- **보고 없이 행동하지 않는다.** 모든 읽기, 검색, 테스트는 보고 후 수행한다.
-- **계획도 보고한다.** 도구 호출이 아닌 사고 과정도 보고 대상이다.
-- **행동을 자유롭게 기술한다.** snake_case 키워드를 직접 만들어 행동을 요약한다.
-- **이유를 구체적으로 쓴다.** 나중에 읽었을 때 맥락이 이해되는 수준으로 쓴다.
-```
-
-### Rule Guard의 Baden 보고
-
-커스텀 서브에이전트는 MCP 도구에 접근할 수 없다 (알려진 버그). Rule Guard는 Bash + HTTP로 보고한다:
+그다음 Phase 6에서 만든 `## Rule Guard` 섹션에 아래 한 줄을 추가한다:
 
 ```markdown
-## Baden 보고 (rule-guard.md에 추가)
-서브에이전트에서는 MCP 도구에 접근할 수 없다. Bash로 직접 보고한다:
-
-curl -s -X POST http://localhost:3800/api/events \
-  -H "Content-Type: application/json" \
-  -d '{"projectName":"...", "action":"...", "reason":"...", "taskId":"..."}'
+- rule-guard 를 호출할 때 현재 taskId 를 프롬프트에 반드시 포함할 것 (서브에이전트의 Baden 보고가 작업에 연결된다)
 ```
 
-### INDEX.yaml 연동
+### 7-3. Rule Guard가 Baden에 보고하게 하기
 
-Baden은 프로젝트의 rules/INDEX.yaml을 파싱해 규칙 메타데이터를 등록한다. 규칙별 참조/위반/수정 빈도가 대시보드에서 추적된다.
+도구가 제한된 서브에이전트는 `baden_*` MCP 도구를 호출하지 못할 수 있다.
+그래서 Rule Guard는 SessionStart 훅이 만드는 래퍼 스크립트를 통해 HTTP로 보고한다
+([README — 서브에이전트에서 보고하기](../README.ko.md#서브에이전트에서-보고하기)).
+아래 예시의 `my-project`는 등록한 프로젝트 이름으로 바꾼다.
+
+**1. `.claude/hooks/setup-baden.sh`** — 실행 권한을 준다 (`chmod +x`)
+
+```bash
+#!/bin/bash
+# 서브에이전트가 HTTP로 Baden에 보고할 때 쓰는 래퍼를 만든다.
+# /tmp는 재부팅 시 비워지므로 세션이 시작될 때마다 다시 만든다.
+cat > /tmp/baden-my-project << 'SCRIPT'
+#!/bin/bash
+# 보고가 실패해도 에이전트를 막지 않도록 항상 0으로 종료한다
+curl -s -m 3 -X POST "${BADEN_API_URL:-http://localhost:3800}/api/query" \
+  -H 'Content-Type: application/json' \
+  -d "{\"projectName\":\"my-project\",$1}" || true
+exit 0
+SCRIPT
+chmod +x /tmp/baden-my-project
+```
+
+**2. `.claude/settings.json`** — 세션이 시작될 때마다 훅을 실행하고 래퍼를 허용한다.
+Phase 6의 컴팩션 훅이 있는 `settings.local.json`과 함께 둬도 된다. 두 파일의 훅이 모두 실행된다.
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(/tmp/baden-my-project:*)"]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/setup-baden.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**3. `.claude/agents/rule-guard.md`에 아래 섹션 추가**
+
+````markdown
+## Baden 보고
+
+모든 검증 단계를 Bash로 `/tmp/baden-my-project`를 통해 Baden에 보고한다.
+래퍼가 없으면 보고를 건너뛰고 결과에 그 사실을 밝힌다. 보고 때문에 검증을 멈추지 않는다.
+
+- 모든 보고에 `ruleId`를 포함하고, 규칙마다 따로 보고한다 (보고 하나에 `ruleId` 하나)
+- 호출한 에이전트가 넘겨준 `taskId`를 항상 포함한다
+
+```bash
+# 적용 대상 규칙
+/tmp/baden-my-project '"action":"check_rule","ruleId":"C1","target":"src/api/users.ts","reason":"C1 적용: src/api/** 아래 파일","taskId":"..."'
+# 규칙별 결과
+/tmp/baden-my-project '"action":"rule_pass","ruleId":"C1","target":"src/api/users.ts","reason":"MUST: ... — 준수","taskId":"..."'
+/tmp/baden-my-project '"action":"rule_violation","ruleId":"C1","target":"src/api/users.ts","reason":"MUST NOT: ... — 42행","severity":"high","taskId":"..."'
+# 최종 판정
+/tmp/baden-my-project '"action":"review_pass","reason":"사전 검토 완료: C1 통과","result":"PASS","taskId":"..."'
+```
+
+| 필드 | 설명 |
+|---|---|
+| `action` | `check_rule`, `rule_pass`, `rule_violation`, `review_pass`, `review_issue` |
+| `ruleId` | 검사하는 규칙의 ID. 최종 판정에서는 생략할 수 있다 |
+| `target` | 검사하는 파일 |
+| `reason` | 판정 근거. MUST/MUST NOT 문구를 인용한다 |
+| `severity` | 위반 시: `critical`, `high`, `medium`, `low` |
+| `result` | 최종 판정: `PASS` 또는 `ISSUE: 요약` |
+| `taskId` | 호출한 에이전트가 넘겨준 taskId |
+````
+
+rule-guard 원칙 섹션의 Bash 허용 범위에도 래퍼를 추가한다
+(예: "Bash는 Baden 보고(`/tmp/baden-my-project`)와 grep 검색에만 사용한다").
+
+실제로 동작하는 전체 예시는 Baden 저장소의 `.claude/agents/rule-guard.md`와 `.claude/hooks/setup-baden.sh`를 참고한다.
+
+### 7-4. INDEX.yaml 연동
+
+Baden은 프로젝트의 `rules/INDEX.yaml`을 파싱해 규칙 메타데이터를 등록한다. 규칙별 참조/위반/수정 빈도가 대시보드에서 추적된다.
+`## MUST`, `## MUST NOT`, `## PREFER` 제목은 영어로 유지한다. Baden이 그 아래 항목 수를 센다.
+
+### 7-5. 확인
+
+사용자에게 새 Claude Code 세션을 시작하고(SessionStart 훅이 실행되도록) 코드를 수정하는 아무 작업이나 지시해 달라고 요청한다. 그다음 다음을 확인한다:
+
+- 프로젝트의 **Monitor** 페이지에 이벤트가 실시간으로 나타난다
+- **Analysis → Rules**에 `INDEX.yaml`의 규칙이 나열된다
+- Rule Guard의 보고가 규칙 ID와 함께 **Rules** 레인에 나타나고, 같은 작업에 연결된다
 
 ---
 
@@ -522,10 +589,11 @@ Phase 6: Rule Guard
   [ ] 컨텍스트 컴팩션 훅 설정
 
 Phase 7: Baden 연동
-  [ ] 프로젝트 등록
-  [ ] CLAUDE.md에 Baden 보고 지침 추가
-  [ ] Rule Guard HTTP 보고 설정
-  [ ] INDEX.yaml 연동 확인
+  [ ] Rules Path와 함께 프로젝트 등록, MCP 서버 등록 (사용자가 수행)
+  [ ] CLAUDE.md에 Baden Monitoring 블록 복사, Rule Guard 섹션에 taskId 줄 추가
+  [ ] SessionStart 훅 + 래퍼 생성, .claude/settings.json에서 허용
+  [ ] rule-guard.md에 보고 섹션 추가
+  [ ] 대시보드에서 이벤트, 규칙, Rule Guard 보고 확인
 ```
 
 ---

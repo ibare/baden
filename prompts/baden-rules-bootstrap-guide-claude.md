@@ -432,55 +432,122 @@ It does not modify code. It only reads, searches, and reports.
 ## Phase 7: Baden Integration (Optional)
 
 With Baden, rule compliance becomes observable in real time.
+The Baden README is the canonical source for the setup steps
+([Setting Up Your Project](../README.md#setting-up-your-project)). This phase applies them to the project you just set up.
 
-### Register the Project
+### 7-1. Prerequisites (the user does these)
 
-Register the project through the Baden dashboard or API.
+Ask the user to confirm the following before continuing, and to tell you the registered project name:
 
-### Add Baden Reporting Instructions to CLAUDE.md
+- Baden is installed and running (`baden status`)
+- The project is registered in the Baden dashboard with **Rules Path** set to the absolute path of this project's `rules/` directory
+- The Baden MCP server is registered with Claude Code ([README — A-2](../README.md#a-2-register-the-mcp-server))
 
-```markdown
-## Baden Monitoring
-- Project Name: `(project name)`
-- This project operates under Baden monitoring. Call the corresponding baden MCP tool for every action.
+### 7-2. Add the Baden Monitoring instructions to CLAUDE.md
 
-### Receiving User Instructions
-- When the user gives a new instruction, call `baden_start_task`. **Call it before starting the work.**
-- Use the returned taskId for all subsequent reports for the same task.
+Copy the `## Baden Monitoring` block from [README — A-3](../README.md#a-3-add-the-monitoring-instructions) into CLAUDE.md as-is,
+and set `Project Name` to the registered name. Do not rewrite it.
 
-### Plan Reporting
-- Even if you are not reading or modifying code, call `baden_plan` when deciding on an approach or making a plan.
-
-### Action Reporting
-- Call `baden_action` **before executing** every action.
-- Use `baden_rule` for rule-related actions and `baden_verify` for verification actions.
-
-### Task Completion Reporting
-- When the task is complete, call `baden_complete_task`.
-
-### Principles
-- **Do not act without reporting.** Perform every read, search, and test only after reporting.
-- **Report plans too.** Thought processes, not just tool calls, are subject to reporting.
-- **Describe actions freely.** Create your own snake_case keywords to summarize actions.
-- **Be specific about reasons.** Write at a level where the context is understandable when read later.
-```
-
-### Rule Guard's Baden Reporting
-
-Custom subagents cannot access MCP tools (a known bug). Rule Guard reports via Bash + HTTP:
+Then add this line to the `## Rule Guard` section from Phase 6:
 
 ```markdown
-## Baden Reporting (add to rule-guard.md)
-Subagents cannot access MCP tools. Report directly via Bash:
-
-curl -s -X POST http://localhost:3800/api/events \
-  -H "Content-Type: application/json" \
-  -d '{"projectName":"...", "action":"...", "reason":"...", "taskId":"..."}'
+- When calling rule-guard, always include the current taskId in the prompt (this links the subagent's Baden reports to the task)
 ```
 
-### INDEX.yaml Integration
+### 7-3. Let Rule Guard report to Baden
 
-Baden parses the project's rules/INDEX.yaml and registers rule metadata. The reference/violation/fix frequency of each rule is tracked on the dashboard.
+A subagent whose tools are restricted may not be able to call the `baden_*` MCP tools.
+Rule Guard therefore reports over HTTP through a wrapper script that a SessionStart hook creates
+([README — Reporting from Subagents](../README.md#reporting-from-subagents)).
+In the examples below, replace `my-project` with the registered project name.
+
+**1. `.claude/hooks/setup-baden.sh`** — make it executable (`chmod +x`)
+
+```bash
+#!/bin/bash
+# Creates the wrapper subagents use to report to Baden over HTTP.
+# /tmp is cleared on reboot, so recreate it at every session start.
+cat > /tmp/baden-my-project << 'SCRIPT'
+#!/bin/bash
+# Always exit 0 so a failed report never blocks the agent
+curl -s -m 3 -X POST "${BADEN_API_URL:-http://localhost:3800}/api/query" \
+  -H 'Content-Type: application/json' \
+  -d "{\"projectName\":\"my-project\",$1}" || true
+exit 0
+SCRIPT
+chmod +x /tmp/baden-my-project
+```
+
+**2. `.claude/settings.json`** — run the hook at every session start and allow the wrapper.
+This can live alongside the compaction hook from Phase 6 in `settings.local.json`; hooks from both files run.
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(/tmp/baden-my-project:*)"]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/setup-baden.sh" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**3. Add this section to `.claude/agents/rule-guard.md`**
+
+````markdown
+## Reporting to Baden
+
+Report every verification step to Baden with Bash through `/tmp/baden-my-project`.
+If the wrapper is missing, skip reporting and say so in your result — never block verification on reporting.
+
+- Include a `ruleId` in every report, and report each rule separately (one `ruleId` per report)
+- Always include the `taskId` passed in by the calling agent
+
+```bash
+# Applicable rule
+/tmp/baden-my-project '"action":"check_rule","ruleId":"C1","target":"src/api/users.ts","reason":"C1 applies: file under src/api/**","taskId":"..."'
+# Result per rule
+/tmp/baden-my-project '"action":"rule_pass","ruleId":"C1","target":"src/api/users.ts","reason":"MUST: ... — compliant","taskId":"..."'
+/tmp/baden-my-project '"action":"rule_violation","ruleId":"C1","target":"src/api/users.ts","reason":"MUST NOT: ... — line 42","severity":"high","taskId":"..."'
+# Final verdict
+/tmp/baden-my-project '"action":"review_pass","reason":"Pre-review complete: C1 passes","result":"PASS","taskId":"..."'
+```
+
+| Field | Description |
+|---|---|
+| `action` | `check_rule`, `rule_pass`, `rule_violation`, `review_pass`, `review_issue` |
+| `ruleId` | ID of the rule being checked. May be omitted in the final verdict |
+| `target` | File being checked |
+| `reason` | Grounds for the verdict, quoting the MUST/MUST NOT text |
+| `severity` | On violation: `critical`, `high`, `medium`, `low` |
+| `result` | Final verdict: `PASS` or `ISSUE: summary` |
+| `taskId` | The taskId passed in by the calling agent |
+````
+
+Also add the wrapper to the Bash allowance in rule-guard's Principles section
+(for example: "Use Bash only for reporting to Baden (`/tmp/baden-my-project`) and for grep searches").
+
+For a complete working example, see `.claude/agents/rule-guard.md` and `.claude/hooks/setup-baden.sh` in the Baden repository.
+
+### 7-4. INDEX.yaml Integration
+
+Baden parses the project's `rules/INDEX.yaml` and registers rule metadata. The reference/violation/fix frequency of each rule is tracked on the dashboard.
+Keep the `## MUST`, `## MUST NOT`, and `## PREFER` headings in English — Baden counts the bullets under them.
+
+### 7-5. Verify
+
+Ask the user to start a new Claude Code session (so the SessionStart hook runs) and give any task that modifies code. Then check:
+
+- Events appear on the project's **Monitor** page in real time
+- **Analysis → Rules** lists the rules from `INDEX.yaml`
+- Rule Guard's reports appear in the **Rules** lane with rule IDs, linked to the same task
 
 ---
 
@@ -522,10 +589,11 @@ Phase 6: Rule Guard
   [ ] Context compaction hook configured
 
 Phase 7: Baden Integration
-  [ ] Project registered
-  [ ] Baden reporting instructions added to CLAUDE.md
-  [ ] Rule Guard HTTP reporting configured
-  [ ] INDEX.yaml integration confirmed
+  [ ] Project registered with Rules Path, MCP server registered (by the user)
+  [ ] Baden Monitoring block copied into CLAUDE.md, taskId line added to Rule Guard section
+  [ ] SessionStart hook + wrapper created, allowed in .claude/settings.json
+  [ ] Reporting section added to rule-guard.md
+  [ ] Events, rules, and Rule Guard reports visible in the dashboard
 ```
 
 ---
