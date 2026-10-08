@@ -49,6 +49,11 @@ export interface RuleSyncResult {
   unchanged: string[];
 }
 
+/** 폴더 선택창 결과 (서버 types.ts 와 같은 모양) */
+export type DirectoryPickResult =
+  | { status: 'selected'; path: string; hasIndex: boolean }
+  | { status: 'cancelled' };
+
 export interface RuleEvent {
   id: string;
   timestamp: string;
@@ -418,6 +423,9 @@ export const api = {
 
   deleteProject: (id: string) =>
     request<{ ok: boolean }>(`/projects/${id}`, { method: 'DELETE' }),
+
+  pickDirectory: (startPath?: string) =>
+    request<DirectoryPickResult>('/fs/pick-directory', { method: 'POST', body: JSON.stringify({ startPath }) }),
 
   // Action Registry
   getActionRegistry: (projectId: string) =>

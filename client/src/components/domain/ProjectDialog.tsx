@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus } from '@phosphor-icons/react';
+import { FolderOpen, Plus } from '@phosphor-icons/react';
 
 const AGENT_OPTIONS: { value: AgentType; label: string }[] = [
   { value: 'claude_code', label: 'Claude Code' },
@@ -61,6 +61,8 @@ export function ProjectDialog({
   const [agent, setAgent] = useState<AgentType>('claude_code');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [picking, setPicking] = useState(false);
+  const [rulesWarning, setRulesWarning] = useState('');
 
   // 수정 모드: 다이얼로그 열릴 때 기존 값으로 초기화
   useEffect(() => {
@@ -70,14 +72,33 @@ export function ProjectDialog({
       setRulesPath(project.rules_path ?? '');
       setAgent(project.agent ?? 'claude_code');
       setError('');
+      setRulesWarning('');
     } else if (open && !project) {
       setName('');
       setDescription('');
       setRulesPath('');
       setAgent('claude_code');
       setError('');
+      setRulesWarning('');
     }
   }, [open, project]);
+
+  // 브라우저는 폴더의 절대 경로를 주지 않으므로 서버가 macOS 선택창을 띄운다
+  const handleBrowse = async () => {
+    setPicking(true);
+    setError('');
+    try {
+      const result = await api.pickDirectory(rulesPath.trim() || undefined);
+      if (result.status === 'selected') {
+        setRulesPath(result.path);
+        setRulesWarning(result.hasIndex ? '' : 'INDEX.yaml not found in this folder.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to open folder picker');
+    } finally {
+      setPicking(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,12 +163,25 @@ export function ProjectDialog({
         </div>
         <div className="space-y-2">
           <Label htmlFor="project-rules">Rules Path</Label>
-          <Input
-            id="project-rules"
-            value={rulesPath}
-            onChange={(e) => setRulesPath(e.target.value)}
-            placeholder="/path/to/.cursor/rules (optional)"
-          />
+          <div className="flex gap-2">
+            <Input
+              id="project-rules"
+              className="min-w-0 flex-1"
+              value={rulesPath}
+              onChange={(e) => {
+                setRulesPath(e.target.value);
+                setRulesWarning('');
+              }}
+              placeholder="/path/to/project/rules (optional)"
+            />
+            <Button type="button" variant="outline" onClick={handleBrowse} disabled={picking}>
+              <FolderOpen />
+              {picking ? 'Choosing...' : 'Browse'}
+            </Button>
+          </div>
+          {rulesWarning && (
+            <p className="text-xs text-amber-600">{rulesWarning}</p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="project-agent">AI Agent</Label>

@@ -98,6 +98,17 @@ export interface RuleSyncResult {
   unchanged: string[];
 }
 
+/** 폴더 선택창 결과 (POST /api/fs/pick-directory) */
+export type DirectoryPickResult =
+  | {
+      status: 'selected';
+      /** 선택한 폴더의 절대 경로. INDEX.yaml 이 하위 rules/ 에 있으면 그 경로로 보정된다 */
+      path: string;
+      /** path 바로 아래에 INDEX.yaml 이 있는지 */
+      hasIndex: boolean;
+    }
+  | { status: 'cancelled' };
+
 export interface RuleEvent {
   id: string;
   timestamp: string;
